@@ -21,19 +21,31 @@ interface PemasukanFormState {
   kategori: string;
   deskripsi: string;
   nominal: string;
+  tanggal: string;
 }
 
 interface PengeluaranFormState {
   kategori: string;
   deskripsi: string;
   nominal: string;
+  tanggal: string;
 }
 
-const EMPTY_PEMASUKAN: PemasukanFormState = { kategori: "donasi", deskripsi: "", nominal: "" };
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const EMPTY_PEMASUKAN: PemasukanFormState = {
+  kategori: "donasi",
+  deskripsi: "",
+  nominal: "",
+  tanggal: todayISO(),
+};
 const EMPTY_PENGELUARAN: PengeluaranFormState = {
   kategori: "kebersihan",
   deskripsi: "",
   nominal: "",
+  tanggal: todayISO(),
 };
 
 type KasFilter = "semua" | "pemasukan" | "pengeluaran" | "pending";
@@ -231,6 +243,20 @@ export default function KasTab(): ReactElement {
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tanggal Transaksi *
+              </label>
+              <input
+                type="date"
+                value={pemasukanForm.tanggal}
+                onChange={(e) => setPemasukanForm({ ...pemasukanForm, tanggal: e.target.value })}
+                required
+                max={todayISO()}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+              />
+            </div>
+
             <button
               type="submit"
               disabled={savingPemasukan}
@@ -313,6 +339,22 @@ export default function KasTab(): ReactElement {
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tanggal Transaksi *
+              </label>
+              <input
+                type="date"
+                value={pengeluaranForm.tanggal}
+                onChange={(e) =>
+                  setPengeluaranForm({ ...pengeluaranForm, tanggal: e.target.value })
+                }
+                required
+                max={todayISO()}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+              />
             </div>
 
             <button
