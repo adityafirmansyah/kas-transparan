@@ -35,6 +35,15 @@ class UserOut(BaseModel):
     created_at: datetime | None = None
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    detail: str = "Password berhasil diubah"
+
+
 # ---------- Komunitas ----------
 
 
