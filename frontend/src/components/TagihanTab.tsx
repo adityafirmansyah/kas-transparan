@@ -418,22 +418,24 @@ export default function TagihanTab({
             </div>
           </div>
 
-          <div className="w-full sm:w-auto flex-1 min-w-[200px]">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-              Jenis Iuran
-            </label>
-            <select
-              value={selectedIuran}
-              onChange={(e) => setSelectedIuran(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
-            >
-              {iuranTypes.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.nama} ({formatRupiah(i.nominal)})
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAdmin && (
+            <div className="w-full sm:w-auto flex-1 min-w-[200px]">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Jenis Iuran
+              </label>
+              <select
+                value={selectedIuran}
+                onChange={(e) => setSelectedIuran(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
+              >
+                {iuranTypes.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.nama} ({formatRupiah(i.nominal)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {isAdmin && (
             <button
