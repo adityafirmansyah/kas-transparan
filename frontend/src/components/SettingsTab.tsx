@@ -75,6 +75,14 @@ export default function SettingsTab({
   const [addUserError, setAddUserError] = useState("");
   const [addUserSuccess, setAddUserSuccess] = useState("");
 
+  // Section 3: Change Own Password (available to admin and ketua)
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+
   const loadUsers = useCallback((): void => {
     if (!komunitasId) return;
     setUsersLoading(true);
@@ -167,6 +175,38 @@ export default function SettingsTab({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  }
+
+  async function handleChangePassword(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password baru minimal 6 karakter");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Konfirmasi password baru tidak cocok");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await api.post("/api/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSuccess("Password berhasil diubah");
+      setTimeout(() => setPasswordSuccess(""), 4000);
+    } catch (err) {
+      setPasswordError(errorMessage(err, "Gagal mengubah password"));
+    } finally {
+      setPasswordSaving(false);
+    }
   }
 
   const activeSlug = komunitas?.slug || slug;
@@ -383,7 +423,125 @@ export default function SettingsTab({
         </div>
       </div>
 
-      {/* Section 2: Daftar Pengurus (Admin & Ketua) */}
+      {/* Section: Ganti Password Akun Sendiri */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-emerald-700" />
+          <h3 className="text-sm font-bold text-slate-900">Ganti Password Akun Saya</h3>
+        </div>
+        <p className="text-xs text-slate-500 -mt-2">
+          Ubah kata sandi login untuk akun Anda sendiri (admin atau ketua)
+        </p>
+
+        {passwordSuccess && (
+          <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-medium">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{passwordSuccess}</span>
+          </div>
+        )}
+        {passwordError && (
+          <div className="flex items-center gap-2.5 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-medium">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="flex-1">{passwordError}</span>
+            <button
+              type="button"
+              onClick={() => setPasswordError("")}
+              className="text-rose-600 hover:text-rose-800"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+          <div>
+            <label
+              htmlFor="input-current-password"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5"
+            >
+              Password Saat Ini
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="input-current-password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="input-new-password"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5"
+            >
+              Password Baru
+            </label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="input-new-password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Minimal 6 karakter</p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="input-confirm-password"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5"
+            >
+              Konfirmasi Password Baru
+            </label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="input-confirm-password"
+                type="password"
+                required
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+              />
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="submit"
+              disabled={passwordSaving}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm transition disabled:opacity-50"
+            >
+              {passwordSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Ubah Password</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Section 3: Daftar Pengurus (Admin & Ketua) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
