@@ -13,9 +13,10 @@ import {
   X,
   Loader2,
   FastForward,
+  Edit2,
 } from "lucide-react";
 import { api, errorMessage } from "../api";
-import type { Warga, WargaCreate } from "../types";
+import type { Warga, WargaCreate, WargaUpdate } from "../types";
 
 interface WargaFormState {
   nama: string;
@@ -38,6 +39,8 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWarga, setEditingWarga] = useState<Warga | null>(null);
+  const [editForm, setEditForm] = useState<WargaFormState>(EMPTY_FORM);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   function load(): void {
@@ -74,9 +77,49 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
     }
   }
 
+  function openEditModal(w: Warga): void {
+    setEditingWarga(w);
+    setEditForm({
+      nama: w.nama,
+      no_hp: w.no_hp || "",
+      alamat: w.alamat || "",
+      no_rumah: w.no_rumah || "",
+    });
+  }
+
+  function closeEditModal(): void {
+    setEditingWarga(null);
+    setDeleteConfirmId(null);
+  }
+
+  async function handleEdit(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    if (!editingWarga) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      const payload: WargaUpdate = {
+        nama: editForm.nama.trim(),
+        no_hp: editForm.no_hp.trim() || undefined,
+        alamat: editForm.alamat.trim() || undefined,
+        no_rumah: editForm.no_rumah.trim() || undefined,
+      };
+      await api.put(`/api/warga/${editingWarga.id}`, payload);
+      setEditingWarga(null);
+      load();
+    } catch (err) {
+      setError(errorMessage(err, "Gagal memperbarui data warga"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function toggleAktif(w: Warga): Promise<void> {
     try {
-      await api.put(`/api/warga/${w.id}`, { aktif: !w.aktif });
+      const resp = await api.put<Warga>(`/api/warga/${w.id}`, { aktif: !w.aktif });
+      if (editingWarga && editingWarga.id === w.id) {
+        setEditingWarga(resp.data);
+      }
       load();
     } catch (err) {
       setError(errorMessage(err, "Gagal mengubah status warga"));
@@ -87,6 +130,9 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
     try {
       await api.delete(`/api/warga/${id}`);
       setDeleteConfirmId(null);
+      if (editingWarga && editingWarga.id === id) {
+        setEditingWarga(null);
+      }
       load();
     } catch (err) {
       setError(errorMessage(err, "Gagal menghapus warga"));
@@ -260,6 +306,14 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(w)}
+                          title="Edit data warga"
+                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
                         {onNavigateToTagihanFuture && w.aktif && (
                           <button
                             type="button"
@@ -269,42 +323,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                           >
                             <FastForward className="w-3 h-3 text-emerald-600" />
                             <span>Bayar Dimuka</span>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => toggleAktif(w)}
-                          title={w.aktif ? "Nonaktifkan warga" : "Aktifkan warga"}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-medium border transition ${
-                            w.aktif
-                              ? "text-slate-700 border-slate-200 hover:bg-slate-100"
-                              : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
-                          }`}
-                        >
-                          {w.aktif ? "Nonaktifkan" : "Aktifkan"}
-                        </button>
-
-                        {deleteConfirmId === w.id ? (
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => confirmDelete(w.id)}
-                              className="text-xs px-2 py-1 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700"
-                            >
-                              Yakin?
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(null)}
-                              className="text-xs px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100"
-                            >
-                              Batal
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirmId(w.id)}
-                            title="Hapus warga"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -388,6 +406,14 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => openEditModal(w)}
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Edit</span>
+                </button>
                 {onNavigateToTagihanFuture && w.aktif && (
                   <button
                     type="button"
@@ -396,41 +422,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                   >
                     <FastForward className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Bayar Dimuka</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => toggleAktif(w)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition ${
-                    w.aktif
-                      ? "text-slate-700 border-slate-200 hover:bg-slate-100"
-                      : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
-                  }`}
-                >
-                  {w.aktif ? "Nonaktifkan" : "Aktifkan"}
-                </button>
-
-                {deleteConfirmId === w.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => confirmDelete(w.id)}
-                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700"
-                    >
-                      Yakin?
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirmId(null)}
-                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-100"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirmId(w.id)}
-                    title="Hapus warga"
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition border border-slate-200"
-                  >
-                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -530,6 +521,152 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Warga Modal */}
+      {editingWarga && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Edit Data Warga</h3>
+                  <p className="text-xs text-slate-500">Perbarui informasi kontak dan alamat</p>
+                </div>
+              </div>
+              <button
+                onClick={() => closeEditModal()}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEdit} className="space-y-4 mt-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Nama Lengkap *
+                </label>
+                <input
+                  required
+                  placeholder="Contoh: Budi Santoso"
+                  value={editForm.nama}
+                  onChange={(e) => setEditForm({ ...editForm, nama: e.target.value })}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                    No. Rumah
+                  </label>
+                  <input
+                    placeholder="Contoh: A-12"
+                    value={editForm.no_rumah}
+                    onChange={(e) => setEditForm({ ...editForm, no_rumah: e.target.value })}
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                    No. Telepon / HP
+                  </label>
+                  <input
+                    placeholder="0812xxxxxxx"
+                    value={editForm.no_hp}
+                    onChange={(e) => setEditForm({ ...editForm, no_hp: e.target.value })}
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Alamat Lengkap
+                </label>
+                <input
+                  placeholder="Contoh: Jl. Mawar No. 12, RT 01"
+                  value={editForm.alamat}
+                  onChange={(e) => setEditForm({ ...editForm, alamat: e.target.value })}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => closeEditModal()}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Danger Zone: Status toggle & Delete */}
+            <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Zona Lainnya
+              </p>
+              <button
+                type="button"
+                onClick={() => toggleAktif(editingWarga)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                  editingWarga.aktif
+                    ? "text-slate-700 border-slate-200 hover:bg-slate-50"
+                    : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                }`}
+              >
+                {editingWarga.aktif ? (
+                  <XCircle className="w-4 h-4" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                <span>{editingWarga.aktif ? "Nonaktifkan Warga" : "Aktifkan Warga"}</span>
+              </button>
+
+              {deleteConfirmId === editingWarga.id ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => confirmDelete(editingWarga.id)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition"
+                  >
+                    Yakin Hapus?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+                  >
+                    Batal
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(editingWarga.id)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-rose-200 text-rose-600 hover:bg-rose-50 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Hapus Warga</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
