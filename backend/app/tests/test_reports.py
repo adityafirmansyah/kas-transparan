@@ -55,8 +55,39 @@ def test_tunggakan_multi_warga_unpaid_across_multiple_periods(client, admin_setu
     entry = data[0]
     assert entry["warga_id"] == warga_ids[0]
     assert entry["total_unpaid_count"] == 3
+    assert entry["distinct_months_count"] == 3
     assert entry["total_nominal"] == 150000
     assert {p["periode"] for p in entry["unpaid_periods"]} == {"2025-01", "2025-02", "2025-03"}
+
+
+def test_tunggakan_multi_multiple_iuran_types_same_month(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran1 = _setup_warga_and_iuran(client, token, n_warga=1)
+    iuran2 = client.post(
+        "/api/iuran-types",
+        json={"nama": "Dana Sosial", "nominal": 20000, "period_type": "monthly"},
+        headers=auth_headers(token),
+    ).json()
+
+    # Generate 2 iuran types for 2 distinct months (total 4 tagihan, 2 months)
+    _generate(client, token, iuran1["id"], "2025-01")
+    _generate(client, token, iuran2["id"], "2025-01")
+    _generate(client, token, iuran1["id"], "2025-02")
+    _generate(client, token, iuran2["id"], "2025-02")
+
+    resp = client.get(
+        "/api/reports/tunggakan-multi",
+        params={"periode_start": "2025-01", "periode_end": "2025-02"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    entry = data[0]
+    # 4 unpaid bills total, but spanning only 2 distinct calendar months
+    assert entry["total_unpaid_count"] == 4
+    assert entry["distinct_months_count"] == 2
+    assert entry["total_nominal"] == 140000
 
 
 def test_tunggakan_multi_warga_unpaid_only_one_period_in_range(client, admin_setup):

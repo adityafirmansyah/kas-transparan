@@ -896,20 +896,29 @@ function TunggakanMultiSection({
                   <tr key={w.warga_id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900">{w.warga_nama}</td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                        <AlertTriangle className="w-3 h-3" />
-                        Nunggak {w.total_unpaid_count} Bulan
-                      </span>
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          Nunggak {w.distinct_months_count} Bulan
+                        </span>
+                        {w.total_unpaid_count !== w.distinct_months_count && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            ({w.total_unpaid_count} tagihan)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600 text-xs">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {w.unpaid_periods.map((p, idx) => (
                           <span
-                            key={`${p.periode}-${idx}`}
-                            className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium"
-                            title={`${p.iuran_nama} — ${formatRupiah(p.nominal)}`}
+                            key={`${p.periode}-${p.iuran_nama}-${idx}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium border border-slate-200/60"
+                            title={formatRupiah(p.nominal)}
                           >
-                            {formatPeriodeLabel(p.periode)}
+                            <span>{formatPeriodeLabel(p.periode)}</span>
+                            <span className="text-slate-400">&bull;</span>
+                            <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
                           </span>
                         ))}
                       </div>
@@ -947,20 +956,29 @@ function TunggakanMultiSection({
             >
               <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-200">
                 <span className="font-semibold text-slate-900 text-sm">{w.warga_nama}</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
-                  <AlertTriangle className="w-3 h-3" />
-                  Nunggak {w.total_unpaid_count} Bulan
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {w.total_unpaid_count !== w.distinct_months_count && (
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {w.total_unpaid_count} tagihan
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                    <AlertTriangle className="w-3 h-3" />
+                    Nunggak {w.distinct_months_count} Bulan
+                  </span>
+                </div>
               </div>
               <div className="p-4 space-y-2">
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {w.unpaid_periods.map((p, idx) => (
                     <span
-                      key={`${p.periode}-${idx}`}
-                      className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium"
-                      title={`${p.iuran_nama} — ${formatRupiah(p.nominal)}`}
+                      key={`${p.periode}-${p.iuran_nama}-${idx}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60"
+                      title={formatRupiah(p.nominal)}
                     >
-                      {formatPeriodeLabel(p.periode)}
+                      <span>{formatPeriodeLabel(p.periode)}</span>
+                      <span className="text-slate-400">&bull;</span>
+                      <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
                     </span>
                   ))}
                 </div>

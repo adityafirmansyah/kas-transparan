@@ -145,6 +145,7 @@ export interface TunggakanMulti {
   warga_nama: string;
   unpaid_periods: TunggakanPeriode[];
   total_unpaid_count: number;
+  distinct_months_count: number;
   total_nominal: number;
 }
 

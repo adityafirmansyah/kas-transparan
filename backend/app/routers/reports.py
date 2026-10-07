@@ -130,9 +130,10 @@ def tunggakan_multi(
             warga_nama=data["warga_nama"],
             unpaid_periods=data["unpaid_periods"],
             total_unpaid_count=len(data["unpaid_periods"]),
+            distinct_months_count=len({p.periode for p in data["unpaid_periods"]}),
             total_nominal=data["total_nominal"],
         )
         for warga_id, data in grouped.items()
     ]
-    results.sort(key=lambda r: (-r.total_unpaid_count, -r.total_nominal))
+    results.sort(key=lambda r: (-r.distinct_months_count, -r.total_unpaid_count, -r.total_nominal))
     return results
