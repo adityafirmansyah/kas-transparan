@@ -249,13 +249,13 @@ export default function IuranTab(): ReactElement {
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => confirmDelete(i.id)}
-                            className="text-xs px-2.5 py-1.5 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700 shadow-sm"
+                            className="min-h-[44px] text-xs px-2.5 py-1.5 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700 shadow-sm"
                           >
                             Hapus?
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="text-xs px-2 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100"
+                            className="min-h-[44px] text-xs px-2 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100"
                           >
                             Batal
                           </button>
@@ -264,7 +264,7 @@ export default function IuranTab(): ReactElement {
                         <button
                           onClick={() => setDeleteConfirmId(i.id)}
                           title="Hapus jenis iuran"
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

@@ -270,7 +270,9 @@ export default function DashboardPage(): ReactElement {
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 }`}
               >
-                <Icon className={`w-5 h-5 sm:w-4 sm:h-4 shrink-0 ${isActive ? "text-emerald-100" : "text-slate-400"}`} />
+                <Icon
+                  className={`w-5 h-5 sm:w-4 sm:h-4 shrink-0 ${isActive ? "text-emerald-100" : "text-slate-400"}`}
+                />
                 <span className="hidden sm:inline">{t.label}</span>
                 {t.id === "Kas" && pendingApprovals > 0 && (
                   <span className="ml-0.5 sm:ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-amber-950">
