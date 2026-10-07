@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PublicPage from "./pages/PublicPage";
+import WargaSelfCheckPage from "./pages/WargaSelfCheckPage";
 import { getSession } from "./api";
 import "./App.css";
 
@@ -47,6 +48,7 @@ function App(): ReactElement {
           }
         />
         <Route path="/public/:slug" element={<PublicPage />} />
+        <Route path="/public/:slug/cek-tagihan" element={<WargaSelfCheckPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -219,7 +219,26 @@ class TunggakanMultiOut(BaseModel):
     total_nominal: float
 
 
-# ---------- Public transparency ----------
+# ---------- Warga Self-Check Portal ----------
+
+
+class WargaSelfCheckTagihan(BaseModel):
+    id: str
+    periode: str
+    iuran_nama: str
+    nominal: float
+    status: str
+    payment_method: str | None = None
+    paid_at: datetime | None = None
+
+
+class WargaSelfCheckResponse(BaseModel):
+    warga_nama: str
+    no_rumah: str | None = None
+    komunitas_nama: str
+    total_unpaid_count: int
+    total_unpaid_nominal: float
+    tagihan_list: list[WargaSelfCheckTagihan]
 
 
 class PublicSummary(BaseModel):
