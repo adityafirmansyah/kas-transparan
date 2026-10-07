@@ -1,11 +1,10 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, useEffect, type ReactElement, type FormEvent } from "react";
 import {
   Receipt,
   Sparkles,
   Calendar,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   Banknote,
   CreditCard,
   X,
@@ -15,9 +14,19 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
+  AlertTriangle,
+  FastForward,
 } from "lucide-react";
 import { api, errorMessage, formatRupiah } from "../api";
-import type { IuranType, PaymentMethod, TagihanWithWarga, TunggakanMulti } from "../types";
+import type {
+  FuturePaymentItem,
+  IuranType,
+  PaymentMethod,
+  RecordFuturePaymentResponse,
+  TagihanWithWarga,
+  TunggakanMulti,
+  Warga,
+} from "../types";
 
 const INDONESIAN_MONTHS = [
   "Januari",
@@ -90,7 +99,15 @@ function groupTagihanByWarga(list: TagihanWithWarga[]): WargaTagihanGroup[] {
   return Array.from(groups.values());
 }
 
-export default function TagihanTab(): ReactElement {
+interface TagihanTabProps {
+  initialFutureWargaId?: string;
+  onClearInitialFutureWargaId?: () => void;
+}
+
+export default function TagihanTab({
+  initialFutureWargaId,
+  onClearInitialFutureWargaId,
+}: TagihanTabProps): ReactElement {
   const [iuranTypes, setIuranTypes] = useState<IuranType[]>([]);
   const [periode, setPeriode] = useState(currentPeriode());
   const [selectedIuran, setSelectedIuran] = useState("");
@@ -109,6 +126,16 @@ export default function TagihanTab(): ReactElement {
   // Checkbox selection state for single-period view
   const [selectedTagihanIds, setSelectedTagihanIds] = useState<string[]>([]);
 
+  // Future Payment Modal State
+  const [isFutureModalOpen, setIsFutureModalOpen] = useState(false);
+  const [wargaList, setWargaList] = useState<Warga[]>([]);
+  const [futureWargaId, setFutureWargaId] = useState("");
+  const [futureIuranId, setFutureIuranId] = useState("");
+  const [futureStartMonth, setFutureStartMonth] = useState(shiftPeriode(currentPeriode(), 1));
+  const [futureMonthsCount, setFutureMonthsCount] = useState(2);
+  const [futurePaymentMethod, setFuturePaymentMethod] = useState<PaymentMethod>("transfer");
+  const [futureSaving, setFutureSaving] = useState(false);
+
   // View mode: single-period tagihan view vs multi-month arrears (tunggakan) view
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [tunggakanStart, setTunggakanStart] = useState(shiftPeriode(currentPeriode(), -2));
@@ -118,9 +145,25 @@ export default function TagihanTab(): ReactElement {
   const [tunggakanError, setTunggakanError] = useState("");
 
   useEffect(() => {
+    if (initialFutureWargaId) {
+      setFutureWargaId(initialFutureWargaId);
+      setIsFutureModalOpen(true);
+      if (onClearInitialFutureWargaId) onClearInitialFutureWargaId();
+    }
+  }, [initialFutureWargaId, onClearInitialFutureWargaId]);
+
+  useEffect(() => {
     api.get<IuranType[]>("/api/iuran-types").then((r) => {
       setIuranTypes(r.data);
-      if (r.data.length > 0) setSelectedIuran(r.data[0].id);
+      if (r.data.length > 0) {
+        setSelectedIuran(r.data[0].id);
+        setFutureIuranId(r.data[0].id);
+      }
+    });
+    api.get<Warga[]>("/api/warga").then((r) => {
+      const active = r.data.filter((w) => w.aktif);
+      setWargaList(active);
+      if (active.length > 0) setFutureWargaId(active[0].id);
     });
   }, []);
 
@@ -230,6 +273,45 @@ export default function TagihanTab(): ReactElement {
     );
   }
 
+  function openFutureModalForWarga(wargaId?: string): void {
+    if (wargaId) setFutureWargaId(wargaId);
+    setIsFutureModalOpen(true);
+  }
+
+  async function handleConfirmFuturePayment(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    if (!futureWargaId || !futureIuranId || futureMonthsCount <= 0) return;
+
+    setFutureSaving(true);
+    setError("");
+
+    try {
+      const items: FuturePaymentItem[] = [];
+      for (let i = 0; i < futureMonthsCount; i++) {
+        items.push({
+          periode: shiftPeriode(futureStartMonth, i),
+          iuran_type_id: futureIuranId,
+        });
+      }
+
+      const resp = await api.post<RecordFuturePaymentResponse>("/api/tagihan/future-pay", {
+        warga_id: futureWargaId,
+        items,
+        payment_method: futurePaymentMethod,
+      });
+
+      setIsFutureModalOpen(false);
+      setMessage(
+        `Pembayaran dimuka berhasil dicatat: ${resp.data.total_paid_count} bulan (${formatRupiah(resp.data.total_nominal)}) untuk ${resp.data.warga_nama}.`
+      );
+      loadTagihan();
+      if (viewMode === "multi") loadTunggakanMulti();
+    } catch (err) {
+      setError(errorMessage(err, "Gagal mencatat pembayaran dimuka"));
+    } finally {
+      setFutureSaving(false);
+    }
+  }
   function openPayAllWargaTunggakan(w: TunggakanMulti): void {
     setPayingItems(
       w.unpaid_periods.map((p) => ({
@@ -368,26 +450,39 @@ export default function TagihanTab(): ReactElement {
         </div>
       </div>
 
-      {/* View Mode Toggle: single-period tagihan vs multi-month arrears */}
-      <div className="bg-white p-1.5 rounded-xl border border-slate-200/80 shadow-sm inline-flex gap-1 w-full sm:w-auto">
+      {/* View Mode Toggle: single-period tagihan vs multi-month arrears vs future payment */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-white p-1.5 rounded-xl border border-slate-200/80 shadow-sm inline-flex gap-1 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setViewMode("single")}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              viewMode === "single"
+                ? "bg-slate-900 text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Tagihan Bulan Ini
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("multi")}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition inline-flex items-center justify-center gap-1.5 ${
+              viewMode === "multi" ? "bg-rose-700 text-white" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Tunggakan Multi-Bulan
+          </button>
+        </div>
+
         <button
           type="button"
-          onClick={() => setViewMode("single")}
-          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition ${
-            viewMode === "single" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
-          }`}
+          onClick={() => openFutureModalForWarga()}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
         >
-          Tagihan Bulan Ini
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewMode("multi")}
-          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition inline-flex items-center justify-center gap-1.5 ${
-            viewMode === "multi" ? "bg-rose-700 text-white" : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Tunggakan Multi-Bulan
+          <FastForward className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Bayar Dimuka / Periode Depan</span>
         </button>
       </div>
 
@@ -651,17 +746,39 @@ export default function TagihanTab(): ReactElement {
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             {t.status === "belum_bayar" ? (
-                              <button
-                                onClick={() => openSinglePay(t)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Tandai Lunas</span>
-                              </button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => openSinglePay(t)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Tandai Lunas</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openFutureModalForWarga(t.warga_id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
+                                  title="Bayar periode mendatang sekaligus untuk warga ini"
+                                >
+                                  <FastForward className="w-3 h-3 text-emerald-700" />
+                                  <span>Dimuka</span>
+                                </button>
+                              </div>
                             ) : (
-                              <span className="text-xs text-slate-400 font-medium italic">
-                                Tercatat
-                              </span>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="text-xs text-slate-400 font-medium italic mr-1">
+                                  Tercatat
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => openFutureModalForWarga(t.warga_id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition"
+                                  title="Bayar periode mendatang untuk warga ini"
+                                >
+                                  <FastForward className="w-3 h-3 text-emerald-600" />
+                                  <span>Bulan Depan</span>
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -744,17 +861,38 @@ export default function TagihanTab(): ReactElement {
                             />
                           )}
                           {t.status === "belum_bayar" ? (
-                            <button
-                              onClick={() => openSinglePay(t)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Lunas</span>
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => openSinglePay(t)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Lunas</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openFutureModalForWarga(t.warga_id)}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
+                                title="Bayar periode mendatang"
+                              >
+                                <FastForward className="w-3 h-3 text-emerald-700" />
+                              </button>
+                            </div>
                           ) : (
-                            <span className="text-xs text-slate-400 font-medium italic">
-                              Tercatat
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-slate-400 font-medium italic">
+                                Tercatat
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openFutureModalForWarga(t.warga_id)}
+                                className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-medium rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition"
+                                title="Bayar periode mendatang"
+                              >
+                                <FastForward className="w-3 h-3 text-emerald-600" />
+                                <span>Depan</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -778,6 +916,7 @@ export default function TagihanTab(): ReactElement {
           error={tunggakanError}
           onDismissError={() => setTunggakanError("")}
           onPayWarga={openPayAllWargaTunggakan}
+          onOpenFuturePay={openFutureModalForWarga}
         />
       )}
 
@@ -902,6 +1041,180 @@ export default function TagihanTab(): ReactElement {
           </div>
         </div>
       )}
+
+      {/* Future / Advance Payment Modal */}
+      {isFutureModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <FastForward className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Bayar Dimuka / Periode Depan
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Catat tagihan lunas di muka khusus untuk warga ini
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFutureModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmFuturePayment} className="my-4 space-y-4">
+              {/* Select Warga */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Pilih Warga
+                </label>
+                <select
+                  value={futureWargaId}
+                  onChange={(e) => setFutureWargaId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                >
+                  {wargaList.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.nama} {w.no_rumah ? `(No. ${w.no_rumah})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Select Iuran Type */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Jenis Iuran
+                </label>
+                <select
+                  value={futureIuranId}
+                  onChange={(e) => setFutureIuranId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                >
+                  {iuranTypes.map((it) => (
+                    <option key={it.id} value={it.id}>
+                      {it.nama} &bull; {formatRupiah(it.nominal)}/bln
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Range: Mulai Periode & Berapa Bulan */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Mulai Periode
+                  </label>
+                  <input
+                    type="month"
+                    value={futureStartMonth}
+                    onChange={(e) => setFutureStartMonth(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Jumlah Bulan
+                  </label>
+                  <select
+                    value={futureMonthsCount}
+                    onChange={(e) => setFutureMonthsCount(parseInt(e.target.value, 10))}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 9, 12].map((n) => (
+                      <option key={n} value={n}>
+                        {n} Bulan ke Depan
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Summary of affected months */}
+              <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Rincian Periode:</span>
+                  <span className="font-semibold text-slate-900">
+                    {Array.from({ length: futureMonthsCount }, (_, i) =>
+                      shiftPeriode(futureStartMonth, i)
+                    ).join(", ")}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-emerald-200/60">
+                  <span className="font-semibold text-slate-700">Total Nominal Masuk Kas:</span>
+                  <span className="font-mono font-bold text-emerald-800 text-sm">
+                    {formatRupiah(
+                      (iuranTypes.find((it) => it.id === futureIuranId)?.nominal || 0) *
+                        futureMonthsCount
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-2">
+                  Metode Penerimaan Uang
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFuturePaymentMethod("transfer")}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition ${
+                      futurePaymentMethod === "transfer"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Transfer Bank</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFuturePaymentMethod("tunai")}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition ${
+                      futurePaymentMethod === "tunai"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Banknote className="w-4 h-4" />
+                    <span>Tunai / Cash</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFutureModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={futureSaving}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {futureSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Simpan Pembayaran Dimuka</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -916,6 +1229,7 @@ interface TunggakanMultiSectionProps {
   error: string;
   onDismissError: () => void;
   onPayWarga: (w: TunggakanMulti) => void;
+  onOpenFuturePay: (wargaId: string) => void;
 }
 
 /**
@@ -934,6 +1248,7 @@ function TunggakanMultiSection({
   error,
   onDismissError,
   onPayWarga,
+  onOpenFuturePay,
 }: TunggakanMultiSectionProps): ReactElement {
   const totalWargaNunggak = data.length;
   const totalNominalTunggakan = data.reduce((acc, d) => acc + d.total_nominal, 0);
@@ -1108,14 +1423,25 @@ function TunggakanMultiSection({
                       {formatRupiah(w.total_nominal)}
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onPayWarga(w)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Bayar Semua ({w.total_unpaid_count})</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onPayWarga(w)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Bayar Semua ({w.total_unpaid_count})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenFuturePay(w.warga_id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
+                          title="Bayar periode mendatang untuk warga ini"
+                        >
+                          <FastForward className="w-3 h-3 text-emerald-700" />
+                          <span>Dimuka</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1179,7 +1505,7 @@ function TunggakanMultiSection({
                     {formatRupiah(w.total_nominal)}
                   </span>
                 </div>
-                <div className="pt-2">
+                <div className="pt-2 flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={() => onPayWarga(w)}
@@ -1190,6 +1516,14 @@ function TunggakanMultiSection({
                       Bayar Semua ({w.total_unpaid_count} Tagihan &bull;{" "}
                       {formatRupiah(w.total_nominal)})
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenFuturePay(w.warga_id)}
+                    className="w-full min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
+                  >
+                    <FastForward className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Bayar Periode Depan Sekaligus</span>
                   </button>
                 </div>
               </div>

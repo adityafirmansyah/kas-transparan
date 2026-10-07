@@ -181,6 +181,26 @@ export interface BatchPayTagihanResponse {
   paid_tagihan: Tagihan[];
 }
 
+export interface FuturePaymentItem {
+  periode: string;
+  iuran_type_id: string;
+}
+
+export interface RecordFuturePaymentRequest {
+  warga_id: string;
+  items: FuturePaymentItem[];
+  payment_method: PaymentMethod;
+  proof_image_path?: string;
+}
+
+export interface RecordFuturePaymentResponse {
+  warga_id: string;
+  warga_nama: string;
+  total_paid_count: number;
+  total_nominal: number;
+  paid_tagihan: Tagihan[];
+}
+
 /** Common shape of FastAPI error responses, e.g. { "detail": "..." }. */
 export interface ApiErrorDetail {
   detail?: string;

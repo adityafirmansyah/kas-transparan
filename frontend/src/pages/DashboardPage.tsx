@@ -35,6 +35,12 @@ export default function DashboardPage(): ReactElement {
   const navigate = useNavigate();
   const { role, komunitasId } = getSession();
   const [tab, setTab] = useState<Tab>("Warga");
+  const [futureWargaId, setFutureWargaId] = useState<string | undefined>(undefined);
+
+  function handleNavigateToFuturePay(wargaId: string): void {
+    setFutureWargaId(wargaId);
+    setTab("Tagihan");
+  }
   const [komunitas, setKomunitas] = useState<Komunitas | null>(null);
 
   // Stats across the app
@@ -288,9 +294,14 @@ export default function DashboardPage(): ReactElement {
 
         {/* Tab Content Section */}
         <div className="transition-opacity duration-200">
-          {tab === "Warga" && <WargaTab />}
+          {tab === "Warga" && <WargaTab onNavigateToTagihanFuture={handleNavigateToFuturePay} />}
           {tab === "Iuran" && <IuranTab />}
-          {tab === "Tagihan" && <TagihanTab />}
+          {tab === "Tagihan" && (
+            <TagihanTab
+              initialFutureWargaId={futureWargaId}
+              onClearInitialFutureWargaId={() => setFutureWargaId(undefined)}
+            />
+          )}
           {tab === "Kas" && <KasTab />}
           {tab === "Pengaturan" && (
             <SettingsTab
