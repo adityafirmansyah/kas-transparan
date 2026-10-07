@@ -18,6 +18,7 @@ from app.models.models import (
     TagihanStatus,
     User,
 )
+from app.routers.kas import filter_kas_entries_by_pic
 from app.schemas.schemas import (
     MonthlyReport,
     TunggakanMultiOut,
@@ -170,6 +171,7 @@ def export_buku_kas(
         .order_by(KasEntry.tanggal.asc())
     )
     entries = query.all()
+    entries = filter_kas_entries_by_pic(db, entries, user)
 
     if periode:
         entries = [e for e in entries if e.tanggal.strftime("%Y-%m") == periode]

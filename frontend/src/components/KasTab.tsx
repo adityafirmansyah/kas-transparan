@@ -449,7 +449,9 @@ export default function KasTab(): ReactElement {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-xs text-slate-500 pr-1 hidden sm:block">Buku Kas Umum</div>
+            <div className="text-xs text-slate-500 pr-1 hidden sm:block">
+              {isAdmin ? "Entri yang Anda kelola" : "Buku Kas Umum (semua PIC)"}
+            </div>
             {isAdmin && (
               <div className="flex items-center gap-1.5">
                 <button
