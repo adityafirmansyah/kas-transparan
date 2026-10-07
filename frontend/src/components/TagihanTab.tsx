@@ -163,7 +163,9 @@ export default function TagihanTab({
     api.get<Warga[]>("/api/warga").then((r) => {
       const active = r.data.filter((w) => w.aktif);
       setWargaList(active);
-      if (active.length > 0) setFutureWargaId(active[0].id);
+      if (active.length > 0) {
+        setFutureWargaId((prev) => prev || active[0].id);
+      }
     });
   }, []);
 
