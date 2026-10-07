@@ -51,7 +51,8 @@ def build_minimal_xlsx(sheet_name: str, rows: list[list]) -> bytes:
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         b'<Relationship Id="rId1" '
-        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        b'Type="http://schemas.openxmlformats.org/'
+        b'officeDocument/2006/relationships/officeDocument" '
         b'Target="xl/workbook.xml"/>'
         b"</Relationships>"
     )
@@ -73,7 +74,8 @@ def build_minimal_xlsx(sheet_name: str, rows: list[list]) -> bytes:
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         b'<Relationship Id="rId1" '
-        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        b'Type="http://schemas.openxmlformats.org/'
+        b'officeDocument/2006/relationships/worksheet" '
         b'Target="worksheets/sheet1.xml"/>'
         b"</Relationships>"
     )
