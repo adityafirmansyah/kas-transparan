@@ -13,8 +13,10 @@ import {
   Loader2,
   Check,
   Filter,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
-import { api, errorMessage, formatRupiah, getSession } from "../api";
+import { api, downloadFile, errorMessage, formatRupiah, getSession } from "../api";
 import type { ApprovalStatus, KasEntry, SaldoResponse } from "../types";
 
 interface PemasukanFormState {
@@ -52,6 +54,7 @@ type KasFilter = "semua" | "pemasukan" | "pengeluaran" | "pending";
 
 export default function KasTab(): ReactElement {
   const { role } = getSession();
+  const isAdmin = role === "admin";
   const [entries, setEntries] = useState<KasEntry[]>([]);
   const [saldo, setSaldo] = useState(0);
   const [pemasukanForm, setPemasukanForm] = useState<PemasukanFormState>(EMPTY_PEMASUKAN);
@@ -62,6 +65,21 @@ export default function KasTab(): ReactElement {
   const [savingPengeluaran, setSavingPengeluaran] = useState(false);
   const [filter, setFilter] = useState<KasFilter>("semua");
   const [approvalActionId, setApprovalActionId] = useState<string | null>(null);
+
+  // Export states (Admin only)
+  const [exportingKas, setExportingKas] = useState<"csv" | "xlsx" | null>(null);
+
+  async function handleExportKas(format: "csv" | "xlsx"): Promise<void> {
+    setExportingKas(format);
+    setError("");
+    try {
+      await downloadFile("/api/reports/export/kas", { format }, `buku-kas.${format}`);
+    } catch (err) {
+      setError(errorMessage(err, "Gagal mengunduh laporan buku kas"));
+    } finally {
+      setExportingKas(null);
+    }
+  }
 
   function load(): void {
     setLoading(true);
@@ -430,7 +448,41 @@ export default function KasTab(): ReactElement {
             </button>
           </div>
 
-          <div className="text-xs text-slate-500 pr-2">Buku Kas Umum Komunitas</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-slate-500 pr-1 hidden sm:block">Buku Kas Umum</div>
+            {isAdmin && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleExportKas("xlsx")}
+                  disabled={exportingKas !== null}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition disabled:opacity-50"
+                  title="Unduh format Excel (.xlsx)"
+                >
+                  {exportingKas === "xlsx" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                  )}
+                  <span>Export Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportKas("csv")}
+                  disabled={exportingKas !== null}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition disabled:opacity-50"
+                  title="Unduh format CSV (.csv)"
+                >
+                  {exportingKas === "csv" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                  )}
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Table (desktop/tablet) */}
