@@ -288,10 +288,11 @@ def record_future_payment(
 
         if tagihan:
             if tagihan.status == TagihanStatus.lunas:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Tagihan {iuran.nama} periode {item.periode} untuk {warga.nama} sudah lunas",
+                msg = (
+                    f"Tagihan {iuran.nama} periode {item.periode} "
+                    f"untuk {warga.nama} sudah lunas"
                 )
+                raise HTTPException(status_code=400, detail=msg)
             tagihan.status = TagihanStatus.lunas
             tagihan.payment_method = method
             tagihan.proof_image_path = payload.proof_image_path

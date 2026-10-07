@@ -81,7 +81,6 @@ def test_public_warga_self_check_success(client, admin_setup):
         headers=auth_headers(admin_token),
     )
     assert warga_resp.status_code == 201
-    warga = warga_resp.json()
 
     # Create iuran and generate tagihan
     iuran_resp = client.post(
