@@ -1,51 +1,59 @@
-import { useEffect, useState } from "react";
-import { api, formatRupiah } from "../api";
+import { useEffect, useState, type ReactElement } from "react";
+import { api, errorMessage, formatRupiah } from "../api";
+import type { IuranType, PaymentMethod, TagihanWithWarga } from "../types";
 
-function currentPeriode() {
+function currentPeriode(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function TagihanTab() {
-  const [iuranTypes, setIuranTypes] = useState([]);
+export default function TagihanTab(): ReactElement {
+  const [iuranTypes, setIuranTypes] = useState<IuranType[]>([]);
   const [periode, setPeriode] = useState(currentPeriode());
   const [selectedIuran, setSelectedIuran] = useState("");
-  const [tagihanList, setTagihanList] = useState([]);
+  const [tagihanList, setTagihanList] = useState<TagihanWithWarga[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/api/iuran-types").then((r) => {
+    api.get<IuranType[]>("/api/iuran-types").then((r) => {
       setIuranTypes(r.data);
       if (r.data.length > 0) setSelectedIuran(r.data[0].id);
     });
   }, []);
 
-  function loadTagihan() {
-    api.get("/api/tagihan", { params: { periode } }).then((r) => setTagihanList(r.data));
+  function loadTagihan(): void {
+    api
+      .get<TagihanWithWarga[]>("/api/tagihan", { params: { periode } })
+      .then((r) => setTagihanList(r.data));
   }
 
   useEffect(loadTagihan, [periode]);
 
-  async function handleGenerate() {
+  async function handleGenerate(): Promise<void> {
     setError("");
     setMessage("");
     try {
-      const resp = await api.post("/api/tagihan/generate", { iuran_type_id: selectedIuran, periode });
+      const resp = await api.post<TagihanWithWarga[]>("/api/tagihan/generate", {
+        iuran_type_id: selectedIuran,
+        periode,
+      });
       setMessage(`${resp.data.length} tagihan baru dibuat untuk periode ${periode}.`);
       loadTagihan();
     } catch (err) {
-      setError(err.response?.data?.detail || "Gagal generate tagihan");
+      setError(errorMessage(err, "Gagal generate tagihan"));
     }
   }
 
-  async function handlePay(tagihanId) {
-    const method = confirm("Klik OK untuk Transfer, Cancel untuk Tunai") ? "transfer" : "tunai";
+  async function handlePay(tagihanId: string): Promise<void> {
+    const method: PaymentMethod = confirm("Klik OK untuk Transfer, Cancel untuk Tunai")
+      ? "transfer"
+      : "tunai";
     try {
       await api.post(`/api/tagihan/${tagihanId}/pay`, { payment_method: method });
       loadTagihan();
     } catch (err) {
-      setError(err.response?.data?.detail || "Gagal mencatat pembayaran");
+      setError(errorMessage(err, "Gagal mencatat pembayaran"));
     }
   }
 
@@ -58,7 +66,11 @@ export default function TagihanTab() {
       <div className="inline-form">
         <label>
           Periode
-          <input value={periode} onChange={(e) => setPeriode(e.target.value)} placeholder="YYYY-MM" />
+          <input
+            value={periode}
+            onChange={(e) => setPeriode(e.target.value)}
+            placeholder="YYYY-MM"
+          />
         </label>
         <label>
           Jenis Iuran
@@ -93,7 +105,9 @@ export default function TagihanTab() {
               <td>{t.status === "lunas" ? "Lunas" : "Belum Bayar"}</td>
               <td>{t.payment_method || "-"}</td>
               <td>
-                {t.status === "belum_bayar" && <button onClick={() => handlePay(t.id)}>Tandai Lunas</button>}
+                {t.status === "belum_bayar" && (
+                  <button onClick={() => handlePay(t.id)}>Tandai Lunas</button>
+                )}
               </td>
             </tr>
           ))}

@@ -1,3 +1,4 @@
+import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -5,12 +6,16 @@ import PublicPage from "./pages/PublicPage";
 import { getSession } from "./api";
 import "./App.css";
 
-function ProtectedRoute({ children }) {
-  const { token } = getSession();
-  return token ? children : <Navigate to="/login" replace />;
+interface ProtectedRouteProps {
+  children: ReactNode;
 }
 
-function App() {
+function ProtectedRoute({ children }: ProtectedRouteProps): ReactElement {
+  const { token } = getSession();
+  return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function App(): ReactElement {
   return (
     <BrowserRouter>
       <Routes>
@@ -30,4 +35,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

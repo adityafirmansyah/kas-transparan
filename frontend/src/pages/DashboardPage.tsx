@@ -1,19 +1,20 @@
+import { useState, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../api";
 import WargaTab from "../components/WargaTab";
 import IuranTab from "../components/IuranTab";
 import TagihanTab from "../components/TagihanTab";
 import KasTab from "../components/KasTab";
-import { useState } from "react";
 
-const TABS = ["Warga", "Iuran", "Tagihan", "Kas"];
+const TABS = ["Warga", "Iuran", "Tagihan", "Kas"] as const;
+type Tab = (typeof TABS)[number];
 
-export default function DashboardPage() {
+export default function DashboardPage(): ReactElement {
   const navigate = useNavigate();
   const { role } = getSession();
-  const [tab, setTab] = useState("Warga");
+  const [tab, setTab] = useState<Tab>("Warga");
 
-  function handleLogout() {
+  function handleLogout(): void {
     clearSession();
     navigate("/login");
   }

@@ -60,8 +60,8 @@ once the UI is running against real data)_
 - **Backend**: FastAPI (Python), SQLAlchemy ORM, JWT auth (python-jose +
   passlib/bcrypt), Pydantic schemas. SQLite by default for easy local dev;
   schema is Postgres-compatible and `docker-compose.yml` runs Postgres.
-- **Frontend**: React + Vite (no Next.js — kept deliberately lightweight),
-  react-router-dom, axios.
+- **Frontend**: React + Vite + TypeScript (no Next.js — kept deliberately
+  lightweight), react-router-dom, axios.
 - **Database**: PostgreSQL (recommended for production) or SQLite (fine for
   small/single-RT deployments).
 - **Tests**: pytest + httpx (FastAPI TestClient), isolated in-memory SQLite
@@ -137,6 +137,31 @@ ruff format .     # auto-format
 
 `ruff check .` also runs on every PR via GitHub Actions
 (`.github/workflows/lint.yml`).
+
+### Linting & type-checking (frontend)
+
+The frontend is TypeScript (`.tsx`/`.ts`), linted with
+[ESLint](https://eslint.org/) (flat config in `frontend/eslint.config.js`,
+using `typescript-eslint` + `eslint-plugin-react-hooks` +
+`eslint-plugin-react-refresh`) and formatted with
+[Prettier](https://prettier.io/) (config in `frontend/.prettierrc`;
+`eslint-config-prettier` disables any ESLint stylistic rules that would
+conflict with it). Type-checking is `tsc --noEmit` via the project's
+`tsconfig.json`/`tsconfig.app.json`/`tsconfig.node.json`.
+
+Run all three before opening a PR:
+
+```bash
+cd frontend
+npm install
+npm run lint           # eslint .
+npm run format:check   # prettier --check . (use `npm run format` to auto-fix)
+npm run typecheck      # tsc -b --noEmit
+npm run build           # tsc -b && vite build — also fails on type errors
+```
+
+All three (`lint`, `format:check`, `typecheck`) also run on every PR via
+GitHub Actions (`.github/workflows/lint.yml`, `frontend-lint` job).
 
 ## Getting started with a new komunitas
 

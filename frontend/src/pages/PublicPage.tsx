@@ -1,23 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { useParams } from "react-router-dom";
-import { api, formatRupiah } from "../api";
+import { api, errorMessage, formatRupiah } from "../api";
+import type { PublicSummary } from "../types";
 
-export default function PublicPage() {
+export default function PublicPage(): ReactElement {
   const { slug } = useParams();
-  const [summary, setSummary] = useState(null);
+  const [summary, setSummary] = useState<PublicSummary | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api
-      .get(`/api/public/${slug}/summary`)
+      .get<PublicSummary>(`/api/public/${slug}/summary`)
       .then((resp) => setSummary(resp.data))
-      .catch((err) => setError(err.response?.data?.detail || "Komunitas tidak ditemukan"))
+      .catch((err) => setError(errorMessage(err, "Komunitas tidak ditemukan")))
       .finally(() => setLoading(false));
   }, [slug]);
 
   if (loading) return <div className="public-page">Memuat...</div>;
-  if (error) return <div className="public-page"><p className="error-banner">{error}</p></div>;
+  if (error || !summary)
+    return (
+      <div className="public-page">
+        <p className="error-banner">{error || "Komunitas tidak ditemukan"}</p>
+      </div>
+    );
 
   return (
     <div className="public-page">
@@ -70,7 +76,8 @@ export default function PublicPage() {
       </section>
 
       <footer className="public-footer">
-        Dikelola dengan <strong>kas-transparan</strong> &mdash; proyek open-source transparansi kas RT/RW.
+        Dikelola dengan <strong>kas-transparan</strong> &mdash; proyek open-source transparansi kas
+        RT/RW.
       </footer>
     </div>
   );

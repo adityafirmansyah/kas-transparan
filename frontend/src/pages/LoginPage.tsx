@@ -1,24 +1,25 @@
-import { useState } from "react";
+import { useState, type FormEvent, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, setSession } from "../api";
+import { api, errorMessage, setSession } from "../api";
+import type { TokenResponse } from "../types";
 
-export default function LoginPage() {
+export default function LoginPage(): ReactElement {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const resp = await api.post("/api/auth/login", { username, password });
+      const resp = await api.post<TokenResponse>("/api/auth/login", { username, password });
       setSession(resp.data);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.detail || "Login gagal");
+      setError(errorMessage(err, "Login gagal"));
     } finally {
       setLoading(false);
     }
@@ -36,7 +37,12 @@ export default function LoginPage() {
         </label>
         <label>
           Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </label>
         <button type="submit" disabled={loading}>
           {loading ? "Memproses..." : "Login"}
