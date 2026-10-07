@@ -383,7 +383,7 @@ def test_iuran_ownership_admin_separation(client, admin_setup):
     w_resp = client.post(
         "/api/warga", json={"nama": "Pak RT Warga"}, headers=auth_headers(admin1_token)
     )
-    warga_id = w_resp.json()["id"]
+    assert w_resp.status_code == 201
 
     # Admin 1 creates Iuran "Kas" -> owned by Admin 1
     iuran_kas = client.post(

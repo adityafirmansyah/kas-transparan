@@ -73,7 +73,8 @@ def delete_iuran_type(
         raise HTTPException(status_code=404, detail="Iuran type tidak ditemukan")
     if iuran.admin_id and iuran.admin_id != user.id:
         raise HTTPException(
-            status_code=403, detail="Hanya admin penanggung jawab yang dapat menghapus jenis iuran ini"
+            status_code=403,
+            detail="Hanya admin penanggung jawab yang dapat menghapus jenis iuran ini",
         )
     db.delete(iuran)
     db.commit()
