@@ -157,8 +157,8 @@ export default function WargaTab(): ReactElement {
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {/* Table Section (desktop/tablet) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -301,10 +301,122 @@ export default function WargaTab(): ReactElement {
         </div>
       </div>
 
+      {/* Card List Section (mobile) */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-10 text-center text-slate-500">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+            <span>Memuat daftar warga...</span>
+          </div>
+        ) : filteredWarga.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-12 text-center text-slate-500">
+            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700">Tidak ada data warga ditemukan</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {search
+                ? "Coba ubah kata kunci pencarian Anda"
+                : "Mulai dengan menambahkan warga pertama"}
+            </p>
+          </div>
+        ) : (
+          filteredWarga.map((w) => (
+            <div
+              key={w.id}
+              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-bold shrink-0">
+                    {w.nama.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-900 text-sm truncate">{w.nama}</div>
+                    {w.no_rumah && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 mt-0.5">
+                        <Home className="w-3 h-3 text-slate-400" />
+                        {w.no_rumah}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                    w.aktif
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-slate-100 text-slate-600 border border-slate-200"
+                  }`}
+                >
+                  {w.aktif ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Aktif</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-3 h-3 text-slate-400" />
+                      <span>Nonaktif</span>
+                    </>
+                  )}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>{w.no_hp || "-"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">{w.alamat || "-"}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-1">
+                <button
+                  onClick={() => toggleAktif(w)}
+                  className={`flex-1 min-h-[44px] text-xs px-2.5 py-2 rounded-lg font-medium border transition ${
+                    w.aktif
+                      ? "text-slate-700 border-slate-200 hover:bg-slate-100"
+                      : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                  }`}
+                >
+                  {w.aktif ? "Nonaktifkan" : "Aktifkan"}
+                </button>
+
+                {deleteConfirmId === w.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => confirmDelete(w.id)}
+                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700"
+                    >
+                      Yakin?
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-100"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirmId(w.id)}
+                    title="Hapus warga"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition border border-slate-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Add Warga Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
