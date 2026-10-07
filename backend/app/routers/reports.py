@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_roles
 from app.models.models import KasEntry, PengeluaranStatus, Tagihan, TagihanStatus, User
-from app.schemas.schemas import MonthlyReport, UnpaidWargaOut
+from app.schemas.schemas import (
+    MonthlyReport,
+    TunggakanMultiOut,
+    TunggakanPeriodeOut,
+    UnpaidWargaOut,
+)
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -78,3 +83,57 @@ def unpaid_warga(
         )
         for t in rows
     ]
+
+
+@router.get("/tunggakan-multi", response_model=list[TunggakanMultiOut])
+def tunggakan_multi(
+    periode_start: str,
+    periode_end: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "ketua")),
+):
+    """Aggregate unpaid tagihan per warga across an inclusive periode range.
+
+    `periode` strings are "YYYY-MM" which sort lexicographically, so a plain
+    string BETWEEN comparison is sufficient to express the date range.
+    """
+    rows = (
+        db.query(Tagihan)
+        .filter(
+            Tagihan.komunitas_id == user.komunitas_id,
+            Tagihan.periode >= periode_start,
+            Tagihan.periode <= periode_end,
+            Tagihan.status == TagihanStatus.belum_bayar,
+        )
+        .order_by(Tagihan.periode)
+        .all()
+    )
+
+    grouped: dict[str, dict] = {}
+    for t in rows:
+        entry = grouped.setdefault(
+            t.warga_id,
+            {"warga_nama": t.warga.nama, "unpaid_periods": [], "total_nominal": 0.0},
+        )
+        entry["unpaid_periods"].append(
+            TunggakanPeriodeOut(
+                periode=t.periode,
+                iuran_nama=t.iuran_type.nama,
+                nominal=t.nominal,
+            )
+        )
+        entry["total_nominal"] += t.nominal
+
+    results = [
+        TunggakanMultiOut(
+            warga_id=warga_id,
+            warga_nama=data["warga_nama"],
+            unpaid_periods=data["unpaid_periods"],
+            total_unpaid_count=len(data["unpaid_periods"]),
+            distinct_months_count=len({p.periode for p in data["unpaid_periods"]}),
+            total_nominal=data["total_nominal"],
+        )
+        for warga_id, data in grouped.items()
+    ]
+    results.sort(key=lambda r: (-r.distinct_months_count, -r.total_unpaid_count, -r.total_nominal))
+    return results

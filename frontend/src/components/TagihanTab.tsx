@@ -5,6 +5,7 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Banknote,
   CreditCard,
   X,
@@ -16,7 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { api, errorMessage, formatRupiah } from "../api";
-import type { IuranType, PaymentMethod, TagihanWithWarga } from "../types";
+import type { IuranType, PaymentMethod, TagihanWithWarga, TunggakanMulti } from "../types";
 
 const INDONESIAN_MONTHS = [
   "Januari",
@@ -59,6 +60,7 @@ function shiftPeriode(periode: string, delta: number): string {
 }
 
 type FilterStatus = "semua" | "lunas" | "belum_bayar";
+type ViewMode = "single" | "multi";
 
 /** A warga along with all of their tagihan in the current filtered view. */
 interface WargaTagihanGroup {
@@ -97,6 +99,14 @@ export default function TagihanTab(): ReactElement {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
   const [payingLoading, setPayingLoading] = useState(false);
 
+  // View mode: single-period tagihan view vs multi-month arrears (tunggakan) view
+  const [viewMode, setViewMode] = useState<ViewMode>("single");
+  const [tunggakanStart, setTunggakanStart] = useState(shiftPeriode(currentPeriode(), -2));
+  const [tunggakanEnd, setTunggakanEnd] = useState(currentPeriode());
+  const [tunggakanList, setTunggakanList] = useState<TunggakanMulti[]>([]);
+  const [tunggakanLoading, setTunggakanLoading] = useState(false);
+  const [tunggakanError, setTunggakanError] = useState("");
+
   useEffect(() => {
     api.get<IuranType[]>("/api/iuran-types").then((r) => {
       setIuranTypes(r.data);
@@ -114,6 +124,25 @@ export default function TagihanTab(): ReactElement {
   }
 
   useEffect(loadTagihan, [periode]);
+
+  function loadTunggakanMulti(): void {
+    setTunggakanLoading(true);
+    setTunggakanError("");
+    api
+      .get<TunggakanMulti[]>("/api/reports/tunggakan-multi", {
+        params: { periode_start: tunggakanStart, periode_end: tunggakanEnd },
+      })
+      .then((r) => setTunggakanList(r.data))
+      .catch((err) =>
+        setTunggakanError(errorMessage(err, "Gagal memuat data tunggakan multi-bulan"))
+      )
+      .finally(() => setTunggakanLoading(false));
+  }
+
+  useEffect(() => {
+    if (viewMode === "multi") loadTunggakanMulti();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, tunggakanStart, tunggakanEnd]);
 
   async function handleGenerate(): Promise<void> {
     setError("");
@@ -260,6 +289,29 @@ export default function TagihanTab(): ReactElement {
         </div>
       </div>
 
+      {/* View Mode Toggle: single-period tagihan vs multi-month arrears */}
+      <div className="bg-white p-1.5 rounded-xl border border-slate-200/80 shadow-sm inline-flex gap-1 w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={() => setViewMode("single")}
+          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition ${
+            viewMode === "single" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Tagihan Bulan Ini
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("multi")}
+          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-semibold transition inline-flex items-center justify-center gap-1.5 ${
+            viewMode === "multi" ? "bg-rose-700 text-white" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Tunggakan Multi-Bulan
+        </button>
+      </div>
+
       {error && (
         <div className="flex items-start gap-2.5 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -283,287 +335,312 @@ export default function TagihanTab(): ReactElement {
         </div>
       )}
 
-      {/* Summary KPI Cards for Tagihan */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
-          <span className="text-xs font-medium text-slate-500 block">
-            Total Tagihan Periode Ini
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-bold text-slate-900 font-mono">{totalTagihan}</span>
-            <span className="text-xs text-slate-400">lembar</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
-          <span className="text-xs font-medium text-slate-500 block">Iuran Lunas Terbayar</span>
-          <div className="flex items-baseline justify-between mt-1">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-emerald-700 font-mono">{totalLunas}</span>
-              <span className="text-xs text-emerald-600 font-medium">
-                ({totalTagihan > 0 ? Math.round((totalLunas / totalTagihan) * 100) : 0}%)
+      {viewMode === "single" && (
+        <>
+          {/* Summary KPI Cards for Tagihan */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+              <span className="text-xs font-medium text-slate-500 block">
+                Total Tagihan Periode Ini
               </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-bold text-slate-900 font-mono">{totalTagihan}</span>
+                <span className="text-xs text-slate-400">lembar</span>
+              </div>
             </div>
-            <span className="text-xs font-bold text-emerald-800 font-mono">
-              {formatRupiah(nominalTerkumpul)}
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+              <span className="text-xs font-medium text-slate-500 block">Iuran Lunas Terbayar</span>
+              <div className="flex items-baseline justify-between mt-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-emerald-700 font-mono">
+                    {totalLunas}
+                  </span>
+                  <span className="text-xs text-emerald-600 font-medium">
+                    ({totalTagihan > 0 ? Math.round((totalLunas / totalTagihan) * 100) : 0}%)
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-emerald-800 font-mono">
+                  {formatRupiah(nominalTerkumpul)}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+              <span className="text-xs font-medium text-slate-500 block">
+                Belum Melakukan Pembayaran
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-bold text-rose-600 font-mono">{totalBelum}</span>
+                <span className="text-xs text-rose-500 font-medium">warga</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Tabs Bar */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-4 h-4 text-slate-400 ml-2 mr-1" />
+              <button
+                onClick={() => setFilterStatus("semua")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  filterStatus === "semua"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Semua ({totalTagihan})
+              </button>
+              <button
+                onClick={() => setFilterStatus("lunas")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  filterStatus === "lunas"
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Lunas ({totalLunas})
+              </button>
+              <button
+                onClick={() => setFilterStatus("belum_bayar")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  filterStatus === "belum_bayar"
+                    ? "bg-rose-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Belum Bayar ({totalBelum})
+              </button>
+            </div>
+
+            <span className="text-xs text-slate-400 pr-2">
+              Periode {formatPeriodeLabel(periode)}
             </span>
           </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
-          <span className="text-xs font-medium text-slate-500 block">
-            Belum Melakukan Pembayaran
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-bold text-rose-600 font-mono">{totalBelum}</span>
-            <span className="text-xs text-rose-500 font-medium">warga</span>
+          {/* Tagihan Table (desktop/tablet) */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-4">Nama Warga</th>
+                    <th className="py-3 px-4">Jenis Iuran</th>
+                    <th className="py-3 px-4">Nominal</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4">Metode Bayar</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-slate-500">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+                        <span>Memuat tagihan...</span>
+                      </td>
+                    </tr>
+                  ) : filteredTagihan.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-500">
+                        <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="font-semibold text-slate-700">
+                          Tidak ada tagihan untuk kriteria ini
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Klik "Generate Tagihan Bulan Ini" untuk membuat tagihan otomatis ke
+                          seluruh warga aktif.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    groupedTagihan.map((group) =>
+                      group.items.map((t, idx) => (
+                        <tr
+                          key={t.id}
+                          className={`hover:bg-slate-50/80 transition-colors ${
+                            group.items.length > 1 ? "bg-emerald-50/30" : ""
+                          }`}
+                        >
+                          <td className="py-3.5 px-4 font-semibold text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span>{t.warga_nama}</span>
+                              {idx === 0 && group.items.length > 1 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                  <Users className="w-3 h-3" />
+                                  {group.items.length} tagihan
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 text-xs font-medium">
+                            {t.iuran_nama}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                            {formatRupiah(t.nominal)}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                                t.status === "lunas"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
+                            >
+                              {t.status === "lunas" ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Lunas</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-3 h-3 text-rose-600" />
+                                  <span>Belum Bayar</span>
+                                </>
+                              )}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 text-xs">
+                            {t.payment_method ? (
+                              <span className="inline-flex items-center gap-1 capitalize font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                {t.payment_method === "transfer" ? (
+                                  <CreditCard className="w-3 h-3 text-slate-500" />
+                                ) : (
+                                  <Banknote className="w-3 h-3 text-slate-500" />
+                                )}
+                                {t.payment_method}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            {t.status === "belum_bayar" ? (
+                              <button
+                                onClick={() => setPayingTagihan(t)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Tandai Lunas</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-medium italic">
+                                Tercatat
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Filter Tabs Bar */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5">
-          <Filter className="w-4 h-4 text-slate-400 ml-2 mr-1" />
-          <button
-            onClick={() => setFilterStatus("semua")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              filterStatus === "semua"
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Semua ({totalTagihan})
-          </button>
-          <button
-            onClick={() => setFilterStatus("lunas")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              filterStatus === "lunas"
-                ? "bg-emerald-700 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Lunas ({totalLunas})
-          </button>
-          <button
-            onClick={() => setFilterStatus("belum_bayar")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              filterStatus === "belum_bayar"
-                ? "bg-rose-700 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Belum Bayar ({totalBelum})
-          </button>
-        </div>
-
-        <span className="text-xs text-slate-400 pr-2">Periode {formatPeriodeLabel(periode)}</span>
-      </div>
-
-      {/* Tagihan Table (desktop) */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="py-3 px-4">Nama Warga</th>
-                <th className="py-3 px-4">Jenis Iuran</th>
-                <th className="py-3 px-4">Nominal</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4">Metode Bayar</th>
-                <th className="py-3 px-4 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-500">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
-                    <span>Memuat tagihan...</span>
-                  </td>
-                </tr>
-              ) : filteredTagihan.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-700">
-                      Tidak ada tagihan untuk kriteria ini
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Klik "Generate Tagihan Bulan Ini" untuk membuat tagihan otomatis ke seluruh
-                      warga aktif.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                groupedTagihan.map((group) =>
-                  group.items.map((t, idx) => (
-                    <tr
-                      key={t.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        group.items.length > 1 ? "bg-emerald-50/30" : ""
-                      }`}
-                    >
-                      <td className="py-3.5 px-4 font-semibold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <span>{t.warga_nama}</span>
-                          {idx === 0 && group.items.length > 1 && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                              <Users className="w-3 h-3" />
-                              {group.items.length} tagihan
+          {/* Tagihan Cards (mobile) — grouped per warga: one card, multiple iuran line-items */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-10 text-center text-slate-500">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+                <span>Memuat tagihan...</span>
+              </div>
+            ) : groupedTagihan.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-12 text-center text-slate-500">
+                <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">Tidak ada tagihan untuk kriteria ini</p>
+                <p className="text-xs text-slate-400 mt-1 px-6">
+                  Klik "Generate Tagihan Bulan Ini" untuk membuat tagihan otomatis ke seluruh warga
+                  aktif.
+                </p>
+              </div>
+            ) : (
+              groupedTagihan.map((group) => (
+                <div
+                  key={group.warga_id}
+                  className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-200">
+                    <span className="font-semibold text-slate-900 text-sm">{group.warga_nama}</span>
+                    {group.items.length > 1 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <Users className="w-3 h-3" />
+                        {group.items.length} tagihan
+                      </span>
+                    )}
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {group.items.map((t) => (
+                      <div key={t.id} className="p-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-600 truncate">
+                            {t.iuran_nama}
+                          </p>
+                          <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                            {formatRupiah(t.nominal)}
+                          </p>
+                          <span
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-1.5 ${
+                              t.status === "lunas"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}
+                          >
+                            {t.status === "lunas" ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Lunas</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-3 h-3 text-rose-600" />
+                                <span>Belum Bayar</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        <div className="shrink-0">
+                          {t.status === "belum_bayar" ? (
+                            <button
+                              onClick={() => setPayingTagihan(t)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Lunas</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium italic">
+                              Tercatat
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 text-xs font-medium">
-                        {t.iuran_nama}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                        {formatRupiah(t.nominal)}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-                            t.status === "lunas"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
-                          }`}
-                        >
-                          {t.status === "lunas" ? (
-                            <>
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>Lunas</span>
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="w-3 h-3 text-rose-600" />
-                              <span>Belum Bayar</span>
-                            </>
-                          )}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 text-xs">
-                        {t.payment_method ? (
-                          <span className="inline-flex items-center gap-1 capitalize font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                            {t.payment_method === "transfer" ? (
-                              <CreditCard className="w-3 h-3 text-slate-500" />
-                            ) : (
-                              <Banknote className="w-3 h-3 text-slate-500" />
-                            )}
-                            {t.payment_method}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        {t.status === "belum_bayar" ? (
-                          <button
-                            onClick={() => setPayingTagihan(t)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Tandai Lunas</span>
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-medium italic">
-                            Tercatat
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Tagihan Cards (mobile) — grouped per warga: one card, multiple iuran line-items */}
-      <div className="md:hidden space-y-3">
-        {loading ? (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-10 text-center text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
-            <span>Memuat tagihan...</span>
-          </div>
-        ) : groupedTagihan.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-12 text-center text-slate-500">
-            <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="font-semibold text-slate-700">Tidak ada tagihan untuk kriteria ini</p>
-            <p className="text-xs text-slate-400 mt-1 px-6">
-              Klik "Generate Tagihan Bulan Ini" untuk membuat tagihan otomatis ke seluruh warga
-              aktif.
-            </p>
-          </div>
-        ) : (
-          groupedTagihan.map((group) => (
-            <div
-              key={group.warga_id}
-              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-200">
-                <span className="font-semibold text-slate-900 text-sm">{group.warga_nama}</span>
-                {group.items.length > 1 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                    <Users className="w-3 h-3" />
-                    {group.items.length} tagihan
-                  </span>
-                )}
-              </div>
-              <div className="divide-y divide-slate-100">
-                {group.items.map((t) => (
-                  <div key={t.id} className="p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-slate-600 truncate">{t.iuran_nama}</p>
-                      <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                        {formatRupiah(t.nominal)}
-                      </p>
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-1.5 ${
-                          t.status === "lunas"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}
-                      >
-                        {t.status === "lunas" ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Lunas</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-3 h-3 text-rose-600" />
-                            <span>Belum Bayar</span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <div className="shrink-0">
-                      {t.status === "belum_bayar" ? (
-                        <button
-                          onClick={() => setPayingTagihan(t)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Lunas</span>
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium italic">Tercatat</span>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {viewMode === "multi" && (
+        <TunggakanMultiSection
+          start={tunggakanStart}
+          end={tunggakanEnd}
+          onStartChange={setTunggakanStart}
+          onEndChange={setTunggakanEnd}
+          data={tunggakanList}
+          loading={tunggakanLoading}
+          error={tunggakanError}
+          onDismissError={() => setTunggakanError("")}
+        />
+      )}
 
       {/* Payment Confirmation Modal */}
       {payingTagihan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">Catat Pembayaran Iuran</h3>
               <button
@@ -647,6 +724,275 @@ export default function TagihanTab(): ReactElement {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface TunggakanMultiSectionProps {
+  start: string;
+  end: string;
+  onStartChange: (periode: string) => void;
+  onEndChange: (periode: string) => void;
+  data: TunggakanMulti[];
+  loading: boolean;
+  error: string;
+  onDismissError: () => void;
+}
+
+/**
+ * Multi-month arrears ("tunggakan multi-bulan") view: lets the admin pick a
+ * configurable periode range and lists every warga with at least one unpaid
+ * tagihan anywhere in that range, worst offenders (most unpaid periods, then
+ * highest nominal owed) sorted first — matching the backend's sort order.
+ */
+function TunggakanMultiSection({
+  start,
+  end,
+  onStartChange,
+  onEndChange,
+  data,
+  loading,
+  error,
+  onDismissError,
+}: TunggakanMultiSectionProps): ReactElement {
+  const totalWargaNunggak = data.length;
+  const totalNominalTunggakan = data.reduce((acc, d) => acc + d.total_nominal, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Range Picker */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-rose-700" />
+          <h3 className="text-base font-bold text-slate-900">Cek Tunggakan Multi-Bulan</h3>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-500">
+          Pilih rentang periode untuk melihat warga yang menunggak di lebih dari satu bulan.
+        </p>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-full sm:w-auto">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Dari Periode
+            </label>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onStartChange(shiftPeriode(start, -1))}
+                aria-label="Periode awal sebelumnya"
+                className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl border border-slate-300 bg-slate-50 min-w-[150px] justify-center">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="font-semibold text-slate-800 whitespace-nowrap">
+                  {formatPeriodeLabel(start)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onStartChange(shiftPeriode(start, 1))}
+                aria-label="Periode awal selanjutnya"
+                className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Sampai Periode
+            </label>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onEndChange(shiftPeriode(end, -1))}
+                aria-label="Periode akhir sebelumnya"
+                className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl border border-slate-300 bg-slate-50 min-w-[150px] justify-center">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="font-semibold text-slate-800 whitespace-nowrap">
+                  {formatPeriodeLabel(end)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onEndChange(shiftPeriode(end, 1))}
+                aria-label="Periode akhir selanjutnya"
+                className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2.5 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium">{error}</div>
+          <button onClick={onDismissError} className="text-rose-600 hover:text-rose-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">Warga Menunggak</span>
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="text-2xl font-bold text-rose-600 font-mono">{totalWargaNunggak}</span>
+            <span className="text-xs text-slate-400">warga</span>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+          <span className="text-xs font-medium text-slate-500 block">Total Nominal Tunggakan</span>
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="text-2xl font-bold text-rose-600 font-mono">
+              {formatRupiah(totalNominalTunggakan)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop/tablet table */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th className="py-3 px-4">Nama Warga</th>
+                <th className="py-3 px-4 text-center">Bulan Nunggak</th>
+                <th className="py-3 px-4">Rincian Periode</th>
+                <th className="py-3 px-4 text-right">Total Tunggakan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="py-10 text-center text-slate-500">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+                    <span>Memuat data tunggakan...</span>
+                  </td>
+                </tr>
+              ) : data.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-slate-500">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-300 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">
+                      Tidak ada warga yang menunggak pada rentang periode ini
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                data.map((w) => (
+                  <tr key={w.warga_id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900">{w.warga_nama}</td>
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          Nunggak {w.distinct_months_count} Bulan
+                        </span>
+                        {w.total_unpaid_count !== w.distinct_months_count && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            ({w.total_unpaid_count} tagihan)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600 text-xs">
+                      <div className="flex flex-wrap gap-1.5">
+                        {w.unpaid_periods.map((p, idx) => (
+                          <span
+                            key={`${p.periode}-${p.iuran_nama}-${idx}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium border border-slate-200/60"
+                            title={formatRupiah(p.nominal)}
+                          >
+                            <span>{formatPeriodeLabel(p.periode)}</span>
+                            <span className="text-slate-400">&bull;</span>
+                            <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-700">
+                      {formatRupiah(w.total_nominal)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-10 text-center text-slate-500">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+            <span>Memuat data tunggakan...</span>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-12 text-center text-slate-500">
+            <CheckCircle2 className="w-8 h-8 text-emerald-300 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700 px-6">
+              Tidak ada warga yang menunggak pada rentang periode ini
+            </p>
+          </div>
+        ) : (
+          data.map((w) => (
+            <div
+              key={w.warga_id}
+              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-200">
+                <span className="font-semibold text-slate-900 text-sm">{w.warga_nama}</span>
+                <div className="flex items-center gap-1.5">
+                  {w.total_unpaid_count !== w.distinct_months_count && (
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {w.total_unpaid_count} tagihan
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                    <AlertTriangle className="w-3 h-3" />
+                    Nunggak {w.distinct_months_count} Bulan
+                  </span>
+                </div>
+              </div>
+              <div className="p-4 space-y-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {w.unpaid_periods.map((p, idx) => (
+                    <span
+                      key={`${p.periode}-${p.iuran_nama}-${idx}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60"
+                      title={formatRupiah(p.nominal)}
+                    >
+                      <span>{formatPeriodeLabel(p.periode)}</span>
+                      <span className="text-slate-400">&bull;</span>
+                      <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
+                  <span className="text-xs text-slate-500">Total Tunggakan</span>
+                  <span className="font-mono font-bold text-rose-700 text-sm">
+                    {formatRupiah(w.total_nominal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

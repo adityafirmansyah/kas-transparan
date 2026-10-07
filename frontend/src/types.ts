@@ -131,6 +131,24 @@ export interface SaldoResponse {
   saldo: number;
 }
 
+/** One unpaid period+iuran line item within a multi-month arrears breakdown. */
+export interface TunggakanPeriode {
+  periode: string;
+  iuran_nama: string;
+  nominal: number;
+}
+
+/** Shape returned by GET /api/reports/tunggakan-multi: a warga's unpaid periods
+ * aggregated across a periode range (multi-month arrears / "tunggakan"). */
+export interface TunggakanMulti {
+  warga_id: string;
+  warga_nama: string;
+  unpaid_periods: TunggakanPeriode[];
+  total_unpaid_count: number;
+  distinct_months_count: number;
+  total_nominal: number;
+}
+
 /** Common shape of FastAPI error responses, e.g. { "detail": "..." }. */
 export interface ApiErrorDetail {
   detail?: string;
