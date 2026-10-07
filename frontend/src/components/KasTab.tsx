@@ -183,200 +183,206 @@ export default function KasTab(): ReactElement {
         </div>
       )}
 
-      {/* Forms Grid: Catat Pemasukan vs Catat Pengeluaran */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Form Pemasukan */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-sm">Catat Pemasukan Kas</h3>
-              <p className="text-[11px] text-slate-500">
-                Iuran di luar sistem billing, donasi, atau hibah
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handlePemasukan} className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
-              <input
-                placeholder="Contoh: donasi, sumbangan warga"
-                value={pemasukanForm.kategori}
-                onChange={(e) => setPemasukanForm({ ...pemasukanForm, kategori: e.target.value })}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Keterangan / Deskripsi *
-              </label>
-              <input
-                placeholder="Contoh: Donasi perbaikan lampu jalan"
-                value={pemasukanForm.deskripsi}
-                onChange={(e) => setPemasukanForm({ ...pemasukanForm, deskripsi: e.target.value })}
-                required
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nominal (Rp) *
-              </label>
-              <div className="relative">
-                <span className="text-xs font-bold text-slate-400 absolute left-3 top-2.5 pointer-events-none">
-                  Rp
-                </span>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="100000"
-                  value={pemasukanForm.nominal}
-                  onChange={(e) => setPemasukanForm({ ...pemasukanForm, nominal: e.target.value })}
-                  required
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-                />
+      {/* Forms Grid: Catat Pemasukan vs Catat Pengeluaran (Admin only) */}
+      {role === "admin" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Form Pemasukan */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Catat Pemasukan Kas</h3>
+                <p className="text-[11px] text-slate-500">
+                  Iuran di luar sistem billing, donasi, atau hibah
+                </p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tanggal Transaksi *
-              </label>
-              <input
-                type="date"
-                value={pemasukanForm.tanggal}
-                onChange={(e) => setPemasukanForm({ ...pemasukanForm, tanggal: e.target.value })}
-                required
-                max={todayISO()}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={savingPemasukan}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-white font-medium text-sm bg-emerald-700 hover:bg-emerald-800 transition shadow-sm disabled:opacity-50"
-            >
-              {savingPemasukan ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Menyimpan...</span>
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Simpan Pemasukan</span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Form Pengeluaran */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <div className="p-2 rounded-xl bg-rose-50 text-rose-700">
-              <TrendingDown className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-sm">Catat Pengeluaran Kas</h3>
-              <p className="text-[11px] text-amber-600 font-medium">
-                * Memerlukan persetujuan Ketua RT/RW sebelum memotong saldo
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handlePengeluaran} className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
-              <input
-                placeholder="Contoh: kebersihan, perbaikan, konsumsi"
-                value={pengeluaranForm.kategori}
-                onChange={(e) =>
-                  setPengeluaranForm({ ...pengeluaranForm, kategori: e.target.value })
-                }
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Keterangan / Deskripsi *
-              </label>
-              <input
-                placeholder="Contoh: Beli sapu dan desinfektan pos ronda"
-                value={pengeluaranForm.deskripsi}
-                onChange={(e) =>
-                  setPengeluaranForm({ ...pengeluaranForm, deskripsi: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nominal (Rp) *
-              </label>
-              <div className="relative">
-                <span className="text-xs font-bold text-slate-400 absolute left-3 top-2.5 pointer-events-none">
-                  Rp
-                </span>
+            <form onSubmit={handlePemasukan} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
                 <input
-                  type="number"
-                  min="1"
-                  placeholder="50000"
-                  value={pengeluaranForm.nominal}
+                  placeholder="Contoh: donasi, sumbangan warga"
+                  value={pemasukanForm.kategori}
+                  onChange={(e) => setPemasukanForm({ ...pemasukanForm, kategori: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Keterangan / Deskripsi *
+                </label>
+                <input
+                  placeholder="Contoh: Donasi perbaikan lampu jalan"
+                  value={pemasukanForm.deskripsi}
                   onChange={(e) =>
-                    setPengeluaranForm({ ...pengeluaranForm, nominal: e.target.value })
+                    setPemasukanForm({ ...pemasukanForm, deskripsi: e.target.value })
                   }
                   required
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nominal (Rp) *
+                </label>
+                <div className="relative">
+                  <span className="text-xs font-bold text-slate-400 absolute left-3 top-2.5 pointer-events-none">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="100000"
+                    value={pemasukanForm.nominal}
+                    onChange={(e) =>
+                      setPemasukanForm({ ...pemasukanForm, nominal: e.target.value })
+                    }
+                    required
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tanggal Transaksi *
+                </label>
+                <input
+                  type="date"
+                  value={pemasukanForm.tanggal}
+                  onChange={(e) => setPemasukanForm({ ...pemasukanForm, tanggal: e.target.value })}
+                  required
+                  max={todayISO()}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingPemasukan}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-white font-medium text-sm bg-emerald-700 hover:bg-emerald-800 transition shadow-sm disabled:opacity-50"
+              >
+                {savingPemasukan ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="w-4 h-4" />
+                    <span>Simpan Pemasukan</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Form Pengeluaran */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <div className="p-2 rounded-xl bg-rose-50 text-rose-700">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Catat Pengeluaran Kas</h3>
+                <p className="text-[11px] text-amber-600 font-medium">
+                  * Memerlukan persetujuan Ketua RT/RW sebelum memotong saldo
+                </p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tanggal Transaksi *
-              </label>
-              <input
-                type="date"
-                value={pengeluaranForm.tanggal}
-                onChange={(e) =>
-                  setPengeluaranForm({ ...pengeluaranForm, tanggal: e.target.value })
-                }
-                required
-                max={todayISO()}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
+            <form onSubmit={handlePengeluaran} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+                <input
+                  placeholder="Contoh: kebersihan, perbaikan, konsumsi"
+                  value={pengeluaranForm.kategori}
+                  onChange={(e) =>
+                    setPengeluaranForm({ ...pengeluaranForm, kategori: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={savingPengeluaran}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-white font-medium text-sm bg-rose-700 hover:bg-rose-800 transition shadow-sm disabled:opacity-50"
-            >
-              {savingPengeluaran ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Menyimpan...</span>
-                </>
-              ) : (
-                <>
-                  <TrendingDown className="w-4 h-4" />
-                  <span>Simpan Pengeluaran</span>
-                </>
-              )}
-            </button>
-          </form>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Keterangan / Deskripsi *
+                </label>
+                <input
+                  placeholder="Contoh: Beli sapu dan desinfektan pos ronda"
+                  value={pengeluaranForm.deskripsi}
+                  onChange={(e) =>
+                    setPengeluaranForm({ ...pengeluaranForm, deskripsi: e.target.value })
+                  }
+                  required
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nominal (Rp) *
+                </label>
+                <div className="relative">
+                  <span className="text-xs font-bold text-slate-400 absolute left-3 top-2.5 pointer-events-none">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="50000"
+                    value={pengeluaranForm.nominal}
+                    onChange={(e) =>
+                      setPengeluaranForm({ ...pengeluaranForm, nominal: e.target.value })
+                    }
+                    required
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tanggal Transaksi *
+                </label>
+                <input
+                  type="date"
+                  value={pengeluaranForm.tanggal}
+                  onChange={(e) =>
+                    setPengeluaranForm({ ...pengeluaranForm, tanggal: e.target.value })
+                  }
+                  required
+                  max={todayISO()}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingPengeluaran}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-white font-medium text-sm bg-rose-700 hover:bg-rose-800 transition shadow-sm disabled:opacity-50"
+              >
+                {savingPengeluaran ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="w-4 h-4" />
+                    <span>Simpan Pengeluaran</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Ledger Table Section */}
       <div className="space-y-3">

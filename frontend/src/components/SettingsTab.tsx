@@ -42,7 +42,8 @@ export default function SettingsTab({
   onKomunitasUpdated,
 }: SettingsTabProps): ReactElement {
   const { role: currentRole, komunitasId } = getSession();
-  const isAdmin = currentRole === "admin";
+  const canEditProfile = currentRole === "ketua";
+  const canManageUsers = currentRole === "ketua";
 
   // Section 1: Community Profile Form
   const [nama, setNama] = useState(komunitas?.nama ?? "");
@@ -67,6 +68,7 @@ export default function SettingsTab({
   const [users, setUsers] = useState<KomunitasUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
+  const hasKetua = users.some((u) => u.role === "ketua");
 
   // Add User Modal
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -117,7 +119,7 @@ export default function SettingsTab({
 
   async function handleSaveProfile(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    if (!komunitasId || !isAdmin) return;
+    if (!komunitasId || !canEditProfile) return;
 
     setProfileError("");
     setProfileSuccess("");
@@ -143,7 +145,7 @@ export default function SettingsTab({
 
   async function handleAddUser(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    if (!komunitasId || !isAdmin) return;
+    if (!komunitasId || !canManageUsers) return;
 
     setAddUserError("");
     setUserSaving(true);
@@ -226,10 +228,10 @@ export default function SettingsTab({
           </p>
         </div>
 
-        {!isAdmin && (
+        {!canEditProfile && (
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold self-start sm:self-auto">
             <Info className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Mode Baca: Hanya Admin yang dapat mengubah data</span>
+            <span>Mode Baca: Hanya Ketua yang dapat mengubah profil komunitas</span>
           </div>
         )}
       </div>
@@ -341,7 +343,7 @@ export default function SettingsTab({
                   id="input-nama-komunitas"
                   type="text"
                   required
-                  disabled={!isAdmin || profileSaving}
+                  disabled={!canEditProfile || profileSaving}
                   value={nama}
                   onChange={(e) => setNama(e.target.value)}
                   placeholder="Contoh: RT 05 / RW 03 Sukamaju"
@@ -367,7 +369,7 @@ export default function SettingsTab({
                     id="input-slug-komunitas"
                     type="text"
                     required
-                    disabled={!isAdmin || profileSaving}
+                    disabled={!canEditProfile || profileSaving}
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
                     placeholder="rt05-sukamaju"
@@ -390,7 +392,7 @@ export default function SettingsTab({
               <textarea
                 id="input-alamat-komunitas"
                 rows={2}
-                disabled={!isAdmin || profileSaving}
+                disabled={!canEditProfile || profileSaving}
                 value={alamat}
                 onChange={(e) => setAlamat(e.target.value)}
                 placeholder="Contoh: Kelurahan Sukamaju, Kecamatan Cilodong, Kota Depok"
@@ -398,7 +400,7 @@ export default function SettingsTab({
               />
             </div>
 
-            {isAdmin && (
+            {canEditProfile && (
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
@@ -552,7 +554,7 @@ export default function SettingsTab({
             </span>
           </div>
 
-          {isAdmin && (
+          {canManageUsers && (
             <button
               type="button"
               onClick={() => {
@@ -831,9 +833,16 @@ export default function SettingsTab({
                     className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                   >
                     <option value="admin">Admin / Bendahara (Kelola Kas &amp; Iuran)</option>
-                    <option value="ketua">Ketua RT / RW (Persetujuan Pencairan Kas)</option>
+                    <option value="ketua" disabled={hasKetua}>
+                      Ketua RT / RW (Persetujuan Pencairan Kas){hasKetua ? " — sudah ada" : ""}
+                    </option>
                   </select>
                 </div>
+                {hasKetua && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Komunitas ini sudah memiliki 1 akun ketua — hanya 1 ketua yang diperbolehkan
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/warga", tags=["warga"])
 def create_warga(
     payload: WargaCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("admin", "ketua")),
 ):
     warga = Warga(komunitas_id=user.komunitas_id, **payload.model_dump())
     db.add(warga)
@@ -55,7 +55,7 @@ def update_warga(
     warga_id: str,
     payload: WargaUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("admin", "ketua")),
 ):
     warga = (
         db.query(Warga)
@@ -75,7 +75,7 @@ def update_warga(
 def delete_warga(
     warga_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("admin", "ketua")),
 ):
     warga = (
         db.query(Warga)

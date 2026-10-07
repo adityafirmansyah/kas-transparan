@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_roles
+from app.core.deps import get_current_user_optional, require_roles
 from app.core.security import hash_password
 from app.models.models import Komunitas, User, UserRole
 from app.schemas.schemas import (
@@ -38,27 +38,61 @@ def create_komunitas(payload: KomunitasCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/{komunitas_id}/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def create_user(komunitas_id: str, payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    komunitas_id: str,
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
     komunitas = db.query(Komunitas).filter(Komunitas.id == komunitas_id).first()
     if not komunitas:
         raise HTTPException(status_code=404, detail="Komunitas tidak ditemukan")
-    existing = (
+
+    existing_ketua = (
+        db.query(User)
+        .filter(User.komunitas_id == komunitas_id, User.role == UserRole.ketua)
+        .first()
+    )
+
+    if existing_ketua is not None:
+        # Bootstrap window has closed (a ketua already exists): only an
+        # authenticated ketua of this komunitas may create further accounts.
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            )
+        if user.role != UserRole.ketua or user.komunitas_id != komunitas_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Hanya ketua yang dapat menambahkan akun pengurus baru",
+            )
+
+    new_role = UserRole(payload.role)
+
+    if new_role == UserRole.ketua and existing_ketua is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Komunitas ini sudah memiliki akun ketua. Hanya 1 ketua yang diperbolehkan",
+        )
+
+    existing_username = (
         db.query(User)
         .filter(User.komunitas_id == komunitas_id, User.username == payload.username)
         .first()
     )
-    if existing:
+    if existing_username:
         raise HTTPException(status_code=400, detail="Username sudah digunakan di komunitas ini")
-    user = User(
+
+    new_user = User(
         komunitas_id=komunitas_id,
         username=payload.username,
         hashed_password=hash_password(payload.password),
-        role=UserRole(payload.role),
+        role=new_role,
     )
-    db.add(user)
+    db.add(new_user)
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(new_user)
+    return new_user
 
 
 @router.get("/{komunitas_id}", response_model=KomunitasOut)
@@ -92,7 +126,7 @@ def update_komunitas(
     komunitas_id: str,
     payload: KomunitasUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("ketua")),
 ):
     if user.komunitas_id != komunitas_id:
         raise HTTPException(
