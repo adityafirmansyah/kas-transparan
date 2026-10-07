@@ -47,9 +47,7 @@ def change_password(
         raise HTTPException(status_code=400, detail="Password saat ini salah")
 
     if len(payload.new_password) < 6:
-        raise HTTPException(
-            status_code=400, detail="Password baru minimal 6 karakter"
-        )
+        raise HTTPException(status_code=400, detail="Password baru minimal 6 karakter")
 
     if verify_password(payload.new_password, user.hashed_password):
         raise HTTPException(

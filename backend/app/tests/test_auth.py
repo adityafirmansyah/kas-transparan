@@ -6,9 +6,7 @@ def auth_headers(token: str) -> dict:
 
 
 def test_login_success(client, admin_setup):
-    resp = client.post(
-        "/api/auth/login", json={"username": "admin1", "password": "secret123"}
-    )
+    resp = client.post("/api/auth/login", json={"username": "admin1", "password": "secret123"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["role"] == "admin"
@@ -16,9 +14,7 @@ def test_login_success(client, admin_setup):
 
 
 def test_login_wrong_password(client, admin_setup):
-    resp = client.post(
-        "/api/auth/login", json={"username": "admin1", "password": "wrongpass"}
-    )
+    resp = client.post("/api/auth/login", json={"username": "admin1", "password": "wrongpass"})
     assert resp.status_code == 401
 
 
@@ -41,9 +37,7 @@ def test_change_password_success_and_relogin(client, admin_setup):
     assert resp.status_code == 200
 
     # Old password should no longer work
-    old_login = client.post(
-        "/api/auth/login", json={"username": "admin1", "password": "secret123"}
-    )
+    old_login = client.post("/api/auth/login", json={"username": "admin1", "password": "secret123"})
     assert old_login.status_code == 401
 
     # New password should work
