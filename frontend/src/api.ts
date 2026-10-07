@@ -1,7 +1,7 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import type { TokenResponse } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export const api = axios.create({ baseURL: API_BASE_URL });
 
@@ -50,8 +50,19 @@ export function formatRupiah(amount: number | null | undefined): string {
 /** Extracts a FastAPI-style `{ detail }` error message, falling back to a default. */
 export function errorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
-    const axiosErr = err as AxiosError<{ detail?: string }>;
-    return axiosErr.response?.data?.detail || fallback;
+    const detail = err.response?.data?.detail;
+    if (typeof detail === "string") {
+      return detail;
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+      return detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join(", ");
+    }
+    if (err.message) {
+      return `${fallback}: ${err.message}`;
+    }
+  }
+  if (err instanceof Error) {
+    return `${fallback}: ${err.message}`;
   }
   return fallback;
 }

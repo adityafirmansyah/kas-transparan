@@ -32,6 +32,7 @@ class UserOut(BaseModel):
     username: str
     role: str
     komunitas_id: str
+    created_at: datetime | None = None
 
 
 # ---------- Komunitas ----------
@@ -40,6 +41,12 @@ class UserOut(BaseModel):
 class KomunitasCreate(BaseModel):
     nama: str
     slug: str
+    alamat: str | None = None
+
+
+class KomunitasUpdate(BaseModel):
+    nama: str | None = None
+    slug: str | None = None
     alamat: str | None = None
 
 

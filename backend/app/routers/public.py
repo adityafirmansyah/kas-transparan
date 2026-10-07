@@ -1,4 +1,4 @@
-"""PUBLIC transparency endpoints — no auth required.
+"""PUBLIC transparency endpoints: no auth required.
 
 This is the core differentiator of the product: any resident can view
 aggregate kas health for their komunitas WITHOUT logging in. To protect
