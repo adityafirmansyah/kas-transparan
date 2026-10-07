@@ -157,13 +157,15 @@ export default function TagihanTab({
       setIuranTypes(r.data);
       if (r.data.length > 0) {
         setSelectedIuran(r.data[0].id);
-        setFutureIuranId(r.data[0].id);
+        setFutureIuranId((prev) => prev || r.data[0].id);
       }
     });
     api.get<Warga[]>("/api/warga").then((r) => {
       const active = r.data.filter((w) => w.aktif);
       setWargaList(active);
-      if (active.length > 0) setFutureWargaId(active[0].id);
+      if (active.length > 0) {
+        setFutureWargaId((prev) => prev || active[0].id);
+      }
     });
   }, []);
 
@@ -273,8 +275,9 @@ export default function TagihanTab({
     );
   }
 
-  function openFutureModalForWarga(wargaId?: string): void {
+  function openFutureModalForWarga(wargaId?: string, iuranTypeId?: string): void {
     if (wargaId) setFutureWargaId(wargaId);
+    if (iuranTypeId) setFutureIuranId(iuranTypeId);
     setIsFutureModalOpen(true);
   }
 
@@ -756,7 +759,9 @@ export default function TagihanTab({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => openFutureModalForWarga(t.warga_id)}
+                                  onClick={() =>
+                                    openFutureModalForWarga(t.warga_id, t.iuran_type_id)
+                                  }
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
                                   title="Bayar periode mendatang sekaligus untuk warga ini"
                                 >
@@ -771,7 +776,9 @@ export default function TagihanTab({
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => openFutureModalForWarga(t.warga_id)}
+                                  onClick={() =>
+                                    openFutureModalForWarga(t.warga_id, t.iuran_type_id)
+                                  }
                                   className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition"
                                   title="Bayar periode mendatang untuk warga ini"
                                 >
@@ -871,7 +878,7 @@ export default function TagihanTab({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => openFutureModalForWarga(t.warga_id)}
+                                onClick={() => openFutureModalForWarga(t.warga_id, t.iuran_type_id)}
                                 className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
                                 title="Bayar periode mendatang"
                               >
@@ -885,7 +892,7 @@ export default function TagihanTab({
                               </span>
                               <button
                                 type="button"
-                                onClick={() => openFutureModalForWarga(t.warga_id)}
+                                onClick={() => openFutureModalForWarga(t.warga_id, t.iuran_type_id)}
                                 className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-medium rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition"
                                 title="Bayar periode mendatang"
                               >
