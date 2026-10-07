@@ -8,13 +8,46 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine, get_db
-from app.models.models import Komunitas, User
+from app.models.models import IuranType, Komunitas, User
 from app.routers import auth, iuran_types, kas, komunitas, public, reports, tagihan, warga
 from app.seed import seed_data
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_sqlite_migrations():
+    """Lightweight migration to add admin_id to iuran_types if missing (SQLite)."""
+    try:
+        with engine.connect() as conn:
+            # Check existing columns in iuran_types
+            result = conn.execute(text("PRAGMA table_info(iuran_types)"))
+            columns = [row[1] for row in result.fetchall()]
+            if "admin_id" not in columns:
+                logger.info("Migrating iuran_types: adding admin_id column...")
+                conn.execute(text("ALTER TABLE iuran_types ADD COLUMN admin_id VARCHAR REFERENCES users(id)"))
+                conn.commit()
+
+            # Backfill existing iuran_types with first admin in their community
+            result_nulls = conn.execute(text("SELECT id, komunitas_id FROM iuran_types WHERE admin_id IS NULL"))
+            for iuran_id, kom_id in result_nulls.fetchall():
+                first_admin = conn.execute(
+                    text("SELECT id FROM users WHERE komunitas_id = :kid AND role = 'admin' ORDER BY created_at ASC LIMIT 1"),
+                    {"kid": kom_id},
+                ).fetchone()
+                if first_admin:
+                    conn.execute(
+                        text("UPDATE iuran_types SET admin_id = :aid WHERE id = :iid"),
+                        {"aid": first_admin[0], "iid": iuran_id},
+                    )
+                    conn.commit()
+    except Exception as exc:
+        logger.warning("Migration hook note: %s", exc)
+
+
+_ensure_sqlite_migrations()
 
 
 @asynccontextmanager

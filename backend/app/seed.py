@@ -165,7 +165,13 @@ def seed_data(db: Session | None = None) -> dict[str, Any]:
             else:
                 results["users_existing"].append(user_data["username"])
 
-        # 3. Iuran Types
+            # 3. Iuran Types
+        primary_admin = (
+            session.query(User)
+            .filter(User.komunitas_id == komunitas.id, User.role == "admin")
+            .order_by(User.created_at.asc())
+            .first()
+        )
         for iuran_data in DEMO_IURAN_TYPES:
             existing_iuran = (
                 session.query(IuranType)
@@ -182,6 +188,7 @@ def seed_data(db: Session | None = None) -> dict[str, Any]:
                     nominal=iuran_data["nominal"],
                     period_type=iuran_data["period_type"],
                     aktif=iuran_data["aktif"],
+                    admin_id=primary_admin.id if primary_admin else None,
                 )
                 session.add(new_iuran)
                 results["iuran_types_created"].append(iuran_data["nama"])

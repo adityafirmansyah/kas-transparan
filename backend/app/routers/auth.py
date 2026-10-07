@@ -29,7 +29,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token(
         {"sub": user.id, "role": user.role.value, "komunitas_id": user.komunitas_id}
     )
-    return TokenResponse(access_token=token, role=user.role.value, komunitas_id=user.komunitas_id)
+    return TokenResponse(
+        access_token=token,
+        role=user.role.value,
+        komunitas_id=user.komunitas_id,
+        user_id=user.id,
+        username=user.username,
+    )
 
 
 @router.get("/me", response_model=UserOut)

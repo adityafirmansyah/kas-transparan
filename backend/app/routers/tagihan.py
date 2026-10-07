@@ -51,6 +51,11 @@ def generate_tagihan(
     )
     if not iuran_type:
         raise HTTPException(status_code=404, detail="Iuran type tidak ditemukan")
+    if iuran_type.admin_id and iuran_type.admin_id != user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Hanya admin penanggung jawab yang dapat membuat tagihan untuk jenis iuran ini",
+        )
 
     active_warga = (
         db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id, Warga.aktif.is_(True)).all()
@@ -92,6 +97,10 @@ def list_tagihan(
     user: User = Depends(require_roles("admin", "ketua")),
 ):
     query = db.query(Tagihan).filter(Tagihan.komunitas_id == user.komunitas_id)
+    if user.role.value == "admin":
+        query = query.join(Tagihan.iuran_type).filter(
+            (IuranType.admin_id == user.id) | (IuranType.admin_id.is_(None))
+        )
     if periode:
         query = query.filter(Tagihan.periode == periode)
     if status_filter:
@@ -132,6 +141,11 @@ def pay_tagihan(
     )
     if not tagihan:
         raise HTTPException(status_code=404, detail="Tagihan tidak ditemukan")
+    if tagihan.iuran_type.admin_id and tagihan.iuran_type.admin_id != user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Hanya admin penanggung jawab yang dapat memproses pembayaran iuran ini",
+        )
     if tagihan.status == TagihanStatus.lunas:
         raise HTTPException(status_code=400, detail="Tagihan sudah lunas")
 
@@ -183,6 +197,11 @@ def batch_pay_tagihan(
         )
 
     for t in tagihans:
+        if t.iuran_type.admin_id and t.iuran_type.admin_id != user.id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Iuran {t.iuran_type.nama} dikelola oleh admin lain",
+            )
         if t.status == TagihanStatus.lunas:
             raise HTTPException(
                 status_code=400,
@@ -274,6 +293,11 @@ def record_future_payment(
 
     for item in payload.items:
         iuran = iuran_types[item.iuran_type_id]
+        if iuran.admin_id and iuran.admin_id != user.id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Iuran {iuran.nama} dikelola oleh admin lain",
+            )
 
         tagihan = (
             db.query(Tagihan)

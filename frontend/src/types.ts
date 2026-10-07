@@ -38,6 +38,8 @@ export interface TokenResponse {
   token_type: string;
   role: Role;
   komunitas_id: string;
+  user_id?: string;
+  username?: string;
 }
 
 export interface Warga {
@@ -73,6 +75,8 @@ export interface IuranType {
   nominal: number;
   period_type: PeriodType;
   aktif: boolean;
+  admin_id?: string | null;
+  admin_username?: string | null;
 }
 
 export interface IuranTypeCreate {
