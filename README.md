@@ -67,6 +67,32 @@ once the UI is running against real data)_
 - **Tests**: pytest + httpx (FastAPI TestClient), isolated in-memory SQLite
   per test.
 
+## Default credentials & quick start
+
+When you start the project for the first time with Docker Compose or run the backend locally, the database is automatically seeded with demo data out-of-the-box (`AUTO_SEED=true` when empty):
+
+- **Komunitas Demo**: `RT 05 Sukamaju` (slug: `demo`)
+- **Admin / Bendahara**: `admin` / `admin123` (manage warga, iuran types, generate bills, record payments & ledger entries)
+- **Ketua**: `ketua` / `ketua123` (read access, approve/reject pengeluaran)
+- **Public Transparency Page**: http://localhost:5173/public/demo (no login required)
+- **Preloaded Sample Data**: 3 iuran types (Kebersihan & Keamanan, Dana Sosial, Kas RT) and 4 sample warga households (Blok A1, A2, B1, B2).
+
+### Running or re-running the seeder manually
+
+The seeder is fully idempotent — running it multiple times is safe and will never duplicate records:
+
+```bash
+# Locally:
+cd backend
+source venv/bin/activate
+python -m app.seed
+
+# Or via Docker Compose:
+docker compose exec backend python -m app.seed
+```
+
+To disable auto-seeding in production, set `AUTO_SEED=false` in environment variables.
+
 ## Local development
 
 ### Option A — Docker Compose (recommended, spins up everything)
@@ -118,10 +144,11 @@ source venv/bin/activate
 pytest -v
 ```
 
-20 tests cover warga CRUD, tagihan auto-generation (incl. idempotency and
+25 tests cover warga CRUD, tagihan auto-generation (incl. idempotency and
 inactive-warga skipping), payment recording, kas ledger saldo calculation,
-the pengeluaran approval workflow, and the public transparency endpoint
-(including a privacy check that no warga name/description leaks).
+the pengeluaran approval workflow, the public transparency endpoint
+(including a privacy check that no warga name/description leaks), and the
+idempotent seeder + auto-seed behavior.
 
 ### Linting & formatting (backend)
 
