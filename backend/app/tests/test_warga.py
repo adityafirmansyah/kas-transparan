@@ -82,9 +82,7 @@ def test_ketua_can_create_warga(client, admin_setup):
 def test_ketua_can_update_warga(client, admin_setup):
     admin_token = admin_setup["admin_token"]
     ketua_token = admin_setup["ketua_token"]
-    create_resp = client.post(
-        "/api/warga", json={"nama": "Edi"}, headers=auth_headers(admin_token)
-    )
+    create_resp = client.post("/api/warga", json={"nama": "Edi"}, headers=auth_headers(admin_token))
     warga_id = create_resp.json()["id"]
 
     resp = client.put(
