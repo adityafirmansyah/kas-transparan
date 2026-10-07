@@ -221,6 +221,7 @@ def test_batch_pay_role_permissions(client, admin_setup):
     client.post(
         f"/api/komunitas/{komunitas_id}/users",
         json={"username": "warga_batch", "password": "secret123", "role": "warga"},
+        headers=auth_headers(ketua_token),
     )
     warga_login = client.post(
         "/api/auth/login", json={"username": "warga_batch", "password": "secret123"}
