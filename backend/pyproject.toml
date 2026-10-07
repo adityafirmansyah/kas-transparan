@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Practical rule set for a small FastAPI MVP: pycodestyle (E/W), pyflakes (F),
+# isort (I), pyupgrade (UP), flake8-bugbear (B). Kept intentionally narrow —
+# not every ruleset — to avoid noisy/low-value churn on a young codebase.
+select = ["E", "W", "F", "I", "UP", "B"]
+# B008 (function call in argument default) is a deliberate false positive here:
+# FastAPI's dependency-injection pattern *requires* calling Depends(...)/
+# require_roles(...) as a parameter default - that's how routes declare their
+# dependencies. This is FastAPI's own documented idiom, not a bug.
+# See https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
+ignore = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
