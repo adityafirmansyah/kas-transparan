@@ -73,7 +73,36 @@ def test_warga_requires_auth(client):
     assert resp.status_code == 401
 
 
-def test_ketua_cannot_create_warga(client, admin_setup):
+def test_ketua_can_create_warga(client, admin_setup):
     token = admin_setup["ketua_token"]
-    resp = client.post("/api/warga", json={"nama": "Tidak Boleh"}, headers=auth_headers(token))
-    assert resp.status_code == 403
+    resp = client.post("/api/warga", json={"nama": "Boleh Sekarang"}, headers=auth_headers(token))
+    assert resp.status_code == 201
+
+
+def test_ketua_can_update_warga(client, admin_setup):
+    admin_token = admin_setup["admin_token"]
+    ketua_token = admin_setup["ketua_token"]
+    create_resp = client.post(
+        "/api/warga", json={"nama": "Edi"}, headers=auth_headers(admin_token)
+    )
+    warga_id = create_resp.json()["id"]
+
+    resp = client.put(
+        f"/api/warga/{warga_id}",
+        json={"nama": "Edi Updated"},
+        headers=auth_headers(ketua_token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["nama"] == "Edi Updated"
+
+
+def test_ketua_can_delete_warga(client, admin_setup):
+    admin_token = admin_setup["admin_token"]
+    ketua_token = admin_setup["ketua_token"]
+    create_resp = client.post(
+        "/api/warga", json={"nama": "Dihapus"}, headers=auth_headers(admin_token)
+    )
+    warga_id = create_resp.json()["id"]
+
+    resp = client.delete(f"/api/warga/{warga_id}", headers=auth_headers(ketua_token))
+    assert resp.status_code == 204

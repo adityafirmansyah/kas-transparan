@@ -92,7 +92,7 @@ def update_komunitas(
     komunitas_id: str,
     payload: KomunitasUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin")),
+    user: User = Depends(require_roles("ketua")),
 ):
     if user.komunitas_id != komunitas_id:
         raise HTTPException(

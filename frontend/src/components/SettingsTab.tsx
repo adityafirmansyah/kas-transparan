@@ -43,6 +43,7 @@ export default function SettingsTab({
 }: SettingsTabProps): ReactElement {
   const { role: currentRole, komunitasId } = getSession();
   const isAdmin = currentRole === "admin";
+  const canEditProfile = currentRole === "ketua";
 
   // Section 1: Community Profile Form
   const [nama, setNama] = useState(komunitas?.nama ?? "");
@@ -117,7 +118,7 @@ export default function SettingsTab({
 
   async function handleSaveProfile(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    if (!komunitasId || !isAdmin) return;
+    if (!komunitasId || !canEditProfile) return;
 
     setProfileError("");
     setProfileSuccess("");
@@ -226,10 +227,10 @@ export default function SettingsTab({
           </p>
         </div>
 
-        {!isAdmin && (
+        {!canEditProfile && (
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold self-start sm:self-auto">
             <Info className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Mode Baca: Hanya Admin yang dapat mengubah data</span>
+            <span>Mode Baca: Hanya Ketua yang dapat mengubah profil komunitas</span>
           </div>
         )}
       </div>
@@ -341,7 +342,7 @@ export default function SettingsTab({
                   id="input-nama-komunitas"
                   type="text"
                   required
-                  disabled={!isAdmin || profileSaving}
+                  disabled={!canEditProfile || profileSaving}
                   value={nama}
                   onChange={(e) => setNama(e.target.value)}
                   placeholder="Contoh: RT 05 / RW 03 Sukamaju"
@@ -367,7 +368,7 @@ export default function SettingsTab({
                     id="input-slug-komunitas"
                     type="text"
                     required
-                    disabled={!isAdmin || profileSaving}
+                    disabled={!canEditProfile || profileSaving}
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
                     placeholder="rt05-sukamaju"
@@ -390,7 +391,7 @@ export default function SettingsTab({
               <textarea
                 id="input-alamat-komunitas"
                 rows={2}
-                disabled={!isAdmin || profileSaving}
+                disabled={!canEditProfile || profileSaving}
                 value={alamat}
                 onChange={(e) => setAlamat(e.target.value)}
                 placeholder="Contoh: Kelurahan Sukamaju, Kecamatan Cilodong, Kota Depok"
@@ -398,7 +399,7 @@ export default function SettingsTab({
               />
             </div>
 
-            {isAdmin && (
+            {canEditProfile && (
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
