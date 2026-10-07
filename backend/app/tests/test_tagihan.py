@@ -265,3 +265,95 @@ def test_batch_pay_role_permissions(client, admin_setup):
         headers=auth_headers(admin_token),
     )
     assert resp_admin.status_code == 200
+
+
+def test_record_future_payment_auto_generates_and_marks_paid(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=1)
+    warga_id = warga_ids[0]
+
+    # Future payment for 3 upcoming months: 2026-11, 2026-12, 2027-01
+    items = [
+        {"periode": "2026-11", "iuran_type_id": iuran["id"]},
+        {"periode": "2026-12", "iuran_type_id": iuran["id"]},
+        {"periode": "2027-01", "iuran_type_id": iuran["id"]},
+    ]
+    resp = client.post(
+        "/api/tagihan/future-pay",
+        json={
+            "warga_id": warga_id,
+            "items": items,
+            "payment_method": "transfer",
+        },
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_paid_count"] == 3
+    assert data["total_nominal"] == 150000.0
+    assert len(data["paid_tagihan"]) == 3
+    for pt in data["paid_tagihan"]:
+        assert pt["status"] == "lunas"
+        assert pt["payment_method"] == "transfer"
+        assert pt["paid_at"] is not None
+
+    # Verify subsequent batch generate for that future month won't duplicate or overwrite
+    gen_resp = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2026-11"},
+        headers=auth_headers(token),
+    )
+    assert gen_resp.status_code == 201
+    # Since this warga already has a tagihan for 2026-11, generate skips them
+    assert len(gen_resp.json()) == 0
+
+
+def test_record_future_payment_pays_existing_unpaid_bill(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=1)
+    warga_id = warga_ids[0]
+
+    # First generate unpaid bill for next month
+    client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2026-11"},
+        headers=auth_headers(token),
+    )
+
+    # Future pay for 2026-11 and 2026-12
+    resp = client.post(
+        "/api/tagihan/future-pay",
+        json={
+            "warga_id": warga_id,
+            "items": [
+                {"periode": "2026-11", "iuran_type_id": iuran["id"]},
+                {"periode": "2026-12", "iuran_type_id": iuran["id"]},
+            ],
+            "payment_method": "tunai",
+        },
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total_paid_count"] == 2
+
+
+def test_record_future_payment_rejects_already_paid(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=1)
+    warga_id = warga_ids[0]
+
+    items = [{"periode": "2026-11", "iuran_type_id": iuran["id"]}]
+    # Pay once
+    client.post(
+        "/api/tagihan/future-pay",
+        json={"warga_id": warga_id, "items": items, "payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+    # Attempt to pay again for the same period
+    resp = client.post(
+        "/api/tagihan/future-pay",
+        json={"warga_id": warga_id, "items": items, "payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 400
+    assert "sudah lunas" in resp.json()["detail"].lower()

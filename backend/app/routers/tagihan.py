@@ -29,6 +29,8 @@ from app.schemas.schemas import (
     BatchPayTagihanResponse,
     GenerateTagihanRequest,
     PayTagihanRequest,
+    RecordFuturePaymentRequest,
+    RecordFuturePaymentResponse,
     TagihanOut,
     TagihanWithWargaOut,
 )
@@ -219,6 +221,114 @@ def batch_pay_tagihan(
 
     return BatchPayTagihanResponse(
         paid_count=len(paid_list),
+        total_nominal=total_nominal,
+        paid_tagihan=paid_list,
+    )
+
+
+@router.post("/future-pay", response_model=RecordFuturePaymentResponse)
+def record_future_payment(
+    payload: RecordFuturePaymentRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """Record upfront/advance payment for a specific member across future periods.
+
+    For each requested (periode, iuran_type_id) item:
+      - Checks if a tagihan already exists for this warga & iuran & periode.
+        If it does and is already paid, raises 400.
+        If it exists and is unpaid, marks it as paid.
+      - If it doesn't exist, auto-generates the tagihan specifically for this warga
+        and marks it as paid immediately.
+      - Automatically creates a corresponding KasEntry (pemasukan) for each item.
+    """
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Daftar periode/iuran tidak boleh kosong")
+
+    warga = (
+        db.query(Warga)
+        .filter(Warga.id == payload.warga_id, Warga.komunitas_id == user.komunitas_id)
+        .first()
+    )
+    if not warga:
+        raise HTTPException(status_code=404, detail="Warga tidak ditemukan")
+
+    # Validate all iuran types belong to this community
+    iuran_type_ids = {it.iuran_type_id for it in payload.items}
+    iuran_types = {
+        it.id: it
+        for it in db.query(IuranType)
+        .filter(IuranType.id.in_(iuran_type_ids), IuranType.komunitas_id == user.komunitas_id)
+        .all()
+    }
+    if len(iuran_types) != len(iuran_type_ids):
+        raise HTTPException(
+            status_code=404,
+            detail="Beberapa jenis iuran tidak ditemukan di komunitas ini",
+        )
+
+    now = datetime.utcnow()
+    method = PaymentMethod(payload.payment_method)
+    paid_list = []
+    total_nominal = 0.0
+
+    for item in payload.items:
+        iuran = iuran_types[item.iuran_type_id]
+
+        tagihan = (
+            db.query(Tagihan)
+            .filter(
+                Tagihan.komunitas_id == user.komunitas_id,
+                Tagihan.warga_id == warga.id,
+                Tagihan.iuran_type_id == item.iuran_type_id,
+                Tagihan.periode == item.periode,
+            )
+            .first()
+        )
+
+        if tagihan:
+            if tagihan.status == TagihanStatus.lunas:
+                msg = f"Tagihan {iuran.nama} periode {item.periode} untuk {warga.nama} sudah lunas"
+                raise HTTPException(status_code=400, detail=msg)
+            tagihan.status = TagihanStatus.lunas
+            tagihan.payment_method = method
+            tagihan.proof_image_path = payload.proof_image_path
+            tagihan.paid_at = now
+        else:
+            tagihan = Tagihan(
+                komunitas_id=user.komunitas_id,
+                warga_id=warga.id,
+                iuran_type_id=item.iuran_type_id,
+                periode=item.periode,
+                nominal=iuran.nominal,
+                status=TagihanStatus.lunas,
+                payment_method=method,
+                proof_image_path=payload.proof_image_path,
+                paid_at=now,
+            )
+            db.add(tagihan)
+
+        kas_entry = KasEntry(
+            komunitas_id=user.komunitas_id,
+            tipe="pemasukan",
+            kategori="iuran",
+            deskripsi=(f"Pembayaran {iuran.nama} - {warga.nama} ({item.periode})"),
+            nominal=iuran.nominal,
+            tagihan_id=tagihan.id,
+            created_by=user.id,
+        )
+        db.add(kas_entry)
+        total_nominal += iuran.nominal
+        paid_list.append(tagihan)
+
+    db.commit()
+    for t in paid_list:
+        db.refresh(t)
+
+    return RecordFuturePaymentResponse(
+        warga_id=warga.id,
+        warga_nama=warga.nama,
+        total_paid_count=len(paid_list),
         total_nominal=total_nominal,
         paid_tagihan=paid_list,
     )

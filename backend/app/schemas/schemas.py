@@ -144,6 +144,26 @@ class BatchPayTagihanResponse(BaseModel):
     paid_tagihan: list[TagihanOut]
 
 
+class FuturePaymentItem(BaseModel):
+    periode: str
+    iuran_type_id: str
+
+
+class RecordFuturePaymentRequest(BaseModel):
+    warga_id: str
+    items: list[FuturePaymentItem]
+    payment_method: str  # "tunai" or "transfer"
+    proof_image_path: str | None = None
+
+
+class RecordFuturePaymentResponse(BaseModel):
+    warga_id: str
+    warga_nama: str
+    total_paid_count: int
+    total_nominal: float
+    paid_tagihan: list[TagihanOut]
+
+
 class TagihanWithWargaOut(TagihanOut):
     warga_nama: str
     iuran_nama: str

@@ -7,11 +7,12 @@ import {
   Home,
   MapPin,
   Trash2,
+  AlertCircle,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  Loader2,
   X,
+  Loader2,
+  FastForward,
 } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Warga, WargaCreate } from "../types";
@@ -25,7 +26,11 @@ interface WargaFormState {
 
 const EMPTY_FORM: WargaFormState = { nama: "", no_hp: "", alamat: "", no_rumah: "" };
 
-export default function WargaTab(): ReactElement {
+interface WargaTabProps {
+  onNavigateToTagihanFuture?: (wargaId: string) => void;
+}
+
+export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): ReactElement {
   const [warga, setWarga] = useState<Warga[]>([]);
   const [form, setForm] = useState<WargaFormState>(EMPTY_FORM);
   const [error, setError] = useState("");
@@ -255,6 +260,17 @@ export default function WargaTab(): ReactElement {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {onNavigateToTagihanFuture && w.aktif && (
+                          <button
+                            type="button"
+                            onClick={() => onNavigateToTagihanFuture(w.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition"
+                            title="Catat bayar dimuka untuk warga ini"
+                          >
+                            <FastForward className="w-3 h-3 text-emerald-600" />
+                            <span>Bayar Dimuka</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => toggleAktif(w)}
                           title={w.aktif ? "Nonaktifkan warga" : "Aktifkan warga"}
@@ -371,10 +387,20 @@ export default function WargaTab(): ReactElement {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-1">
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                {onNavigateToTagihanFuture && w.aktif && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToTagihanFuture(w.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition"
+                  >
+                    <FastForward className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Bayar Dimuka</span>
+                  </button>
+                )}
                 <button
                   onClick={() => toggleAktif(w)}
-                  className={`flex-1 min-h-[44px] text-xs px-2.5 py-2 rounded-lg font-medium border transition ${
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition ${
                     w.aktif
                       ? "text-slate-700 border-slate-200 hover:bg-slate-100"
                       : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"

@@ -95,7 +95,7 @@ def check_warga_tagihan(
         db.query(Warga)
         .filter(
             Warga.komunitas_id == komunitas.id,
-            Warga.aktif == True,
+            Warga.aktif.is_(True),
             Warga.no_hp.isnot(None),
         )
         .all()
