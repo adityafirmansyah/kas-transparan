@@ -98,14 +98,11 @@ def tunggakan_multi(
     `periode` strings are "YYYY-MM" which sort lexicographically, so a plain
     string BETWEEN comparison is sufficient to express the date range.
     """
-    query = (
-        db.query(Tagihan)
-        .filter(
-            Tagihan.komunitas_id == user.komunitas_id,
-            Tagihan.periode >= periode_start,
-            Tagihan.periode <= periode_end,
-            Tagihan.status == TagihanStatus.belum_bayar,
-        )
+    query = db.query(Tagihan).filter(
+        Tagihan.komunitas_id == user.komunitas_id,
+        Tagihan.periode >= periode_start,
+        Tagihan.periode <= periode_end,
+        Tagihan.status == TagihanStatus.belum_bayar,
     )
     if user.role.value == "admin":
         query = query.join(Tagihan.iuran_type).filter(
