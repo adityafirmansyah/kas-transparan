@@ -101,7 +101,7 @@ export default function IuranTab(): ReactElement {
       )}
 
       {/* Grid: Create Form + Iuran Cards/Table */}
-      <div className={`grid grid-cols-1 ${isAdmin ? "lg:grid-cols-3" : "max-w-3xl"} gap-6`}>
+      <div className={isAdmin ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : "w-full"}>
         {/* Form Column (Admin only) */}
         {isAdmin && (
           <div className="lg:col-span-1">
@@ -190,7 +190,7 @@ export default function IuranTab(): ReactElement {
         )}
 
         {/* List / Cards Column */}
-        <div className={isAdmin ? "lg:col-span-2 space-y-4" : "col-span-1 space-y-4"}>
+        <div className={isAdmin ? "lg:col-span-2 space-y-4" : "w-full space-y-4"}>
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-900 text-sm">Daftar Iuran Aktif</h3>
