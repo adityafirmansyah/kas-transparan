@@ -199,3 +199,68 @@ def test_tunggakan_multi_allows_ketua_role(client, admin_setup):
         headers=auth_headers(ketua_token),
     )
     assert resp.status_code == 200
+
+
+def test_export_buku_kas_csv_and_xlsx(client, admin_setup):
+    token = admin_setup["admin_token"]
+
+    # Record sample pemasukan
+    client.post(
+        "/api/kas/pemasukan",
+        json={"kategori": "donasi", "deskripsi": "Sumbangan Warga", "nominal": 100000},
+        headers=auth_headers(token),
+    )
+
+    # Export CSV
+    resp_csv = client.get(
+        "/api/reports/export/kas",
+        params={"format": "csv"},
+        headers=auth_headers(token),
+    )
+    assert resp_csv.status_code == 200
+    assert "text/csv" in resp_csv.headers["content-type"]
+    assert "Sumbangan Warga" in resp_csv.text
+
+    # Export XLSX
+    resp_xlsx = client.get(
+        "/api/reports/export/kas",
+        params={"format": "xlsx"},
+        headers=auth_headers(token),
+    )
+    assert resp_xlsx.status_code == 200
+    assert len(resp_xlsx.content) > 500
+
+
+def test_export_tagihan_csv_and_xlsx(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=2)
+    _generate(client, token, iuran["id"], "2026-10")
+
+    # Export CSV
+    resp_csv = client.get(
+        "/api/reports/export/tagihan",
+        params={"format": "csv", "periode": "2026-10"},
+        headers=auth_headers(token),
+    )
+    assert resp_csv.status_code == 200
+    assert "text/csv" in resp_csv.headers["content-type"]
+    assert "Iuran Kebersihan" in resp_csv.text
+
+    # Export XLSX
+    resp_xlsx = client.get(
+        "/api/reports/export/tagihan",
+        params={"format": "xlsx", "periode": "2026-10"},
+        headers=auth_headers(token),
+    )
+    assert resp_xlsx.status_code == 200
+    assert len(resp_xlsx.content) > 500
+
+
+def test_export_ketua_forbidden(client, admin_setup):
+    ketua_token = admin_setup["ketua_token"]
+    resp = client.get(
+        "/api/reports/export/kas",
+        params={"format": "csv"},
+        headers=auth_headers(ketua_token),
+    )
+    assert resp.status_code == 403

@@ -16,8 +16,10 @@ import {
   Users,
   AlertTriangle,
   FastForward,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
-import { api, errorMessage, formatRupiah, getSession } from "../api";
+import { api, downloadFile, errorMessage, formatRupiah, getSession } from "../api";
 import type {
   FuturePaymentItem,
   IuranType,
@@ -127,6 +129,25 @@ export default function TagihanTab({
 
   // Checkbox selection state for single-period view
   const [selectedTagihanIds, setSelectedTagihanIds] = useState<string[]>([]);
+
+  // Export states (Admin only)
+  const [exportingTagihan, setExportingTagihan] = useState<"csv" | "xlsx" | null>(null);
+
+  async function handleExportTagihan(format: "csv" | "xlsx"): Promise<void> {
+    setExportingTagihan(format);
+    setError("");
+    try {
+      await downloadFile(
+        "/api/reports/export/tagihan",
+        { format, periode },
+        `rekap-tagihan-${periode}.${format}`
+      );
+    } catch (err) {
+      setError(errorMessage(err, "Gagal mengunduh laporan tagihan"));
+    } finally {
+      setExportingTagihan(null);
+    }
+  }
 
   // Future Payment Modal State
   const [isFutureModalOpen, setIsFutureModalOpen] = useState(false);
@@ -630,6 +651,39 @@ export default function TagihanTab({
               <span className="text-xs text-slate-400 pr-2">
                 Periode {formatPeriodeLabel(periode)}
               </span>
+
+              {isAdmin && (
+                <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                  <button
+                    type="button"
+                    onClick={() => handleExportTagihan("xlsx")}
+                    disabled={exportingTagihan !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition disabled:opacity-50"
+                    title={`Unduh Rekap Tagihan ${periode} format Excel (.xlsx)`}
+                  >
+                    {exportingTagihan === "xlsx" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                    )}
+                    <span>Export Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportTagihan("csv")}
+                    disabled={exportingTagihan !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition disabled:opacity-50"
+                    title={`Unduh Rekap Tagihan ${periode} format CSV (.csv)`}
+                  >
+                    {exportingTagihan === "csv" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

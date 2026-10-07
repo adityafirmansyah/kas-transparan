@@ -61,6 +61,38 @@ export function formatRupiah(amount: number | null | undefined): string {
   }).format(amount || 0);
 }
 
+/** Downloads a binary or text file response from an authenticated endpoint */
+export async function downloadFile(
+  url: string,
+  params: Record<string, string>,
+  defaultFilename: string
+): Promise<void> {
+  const token = localStorage.getItem("kas_token");
+  const query = new URLSearchParams(params).toString();
+  const fullUrl = `${url}${query ? `?${query}` : ""}`;
+  const response = await fetch(fullUrl, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(`Gagal mengunduh file (${response.status})`);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition");
+  let filename = defaultFilename;
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
 /** Extracts a FastAPI-style `{ detail }` error message, falling back to a default. */
 export function errorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
