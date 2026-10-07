@@ -358,3 +358,124 @@ def test_record_future_payment_rejects_already_paid(client, admin_setup):
     )
     assert resp.status_code == 400
     assert "sudah lunas" in resp.json()["detail"].lower()
+
+
+def test_iuran_ownership_admin_separation(client, admin_setup):
+    admin1_token = admin_setup["admin_token"]
+    ketua_token = admin_setup["ketua_token"]
+    komunitas_id = admin_setup["komunitas"]["id"]
+
+    # Ketua creates a second admin
+    resp_create_admin2 = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "admin2", "password": "password123", "role": "admin"},
+        headers=auth_headers(ketua_token),
+    )
+    assert resp_create_admin2.status_code == 201
+    admin2_id = resp_create_admin2.json()["id"]
+
+    login_admin2 = client.post(
+        "/api/auth/login", json={"username": "admin2", "password": "password123"}
+    )
+    admin2_token = login_admin2.json()["access_token"]
+
+    # Create warga
+    w_resp = client.post(
+        "/api/warga", json={"nama": "Pak RT Warga"}, headers=auth_headers(admin1_token)
+    )
+    assert w_resp.status_code == 201
+
+    # Admin 1 creates Iuran "Kas" -> owned by Admin 1
+    iuran_kas = client.post(
+        "/api/iuran-types",
+        json={"nama": "Iuran Kas", "nominal": 20000, "period_type": "monthly"},
+        headers=auth_headers(admin1_token),
+    ).json()
+    assert iuran_kas["admin_id"] is not None
+
+    # Admin 2 creates Iuran "Jalan" -> owned by Admin 2
+    iuran_jalan = client.post(
+        "/api/iuran-types",
+        json={"nama": "Iuran Jalan", "nominal": 50000, "period_type": "monthly"},
+        headers=auth_headers(admin2_token),
+    ).json()
+    assert iuran_jalan["admin_id"] == admin2_id
+
+    # Admin 1 list_iuran_types only sees "Iuran Kas", not "Iuran Jalan"
+    a1_list = client.get("/api/iuran-types", headers=auth_headers(admin1_token)).json()
+    a1_names = {i["nama"] for i in a1_list}
+    assert "Iuran Kas" in a1_names
+    assert "Iuran Jalan" not in a1_names
+
+    # Admin 2 list_iuran_types only sees "Iuran Jalan", not "Iuran Kas"
+    a2_list = client.get("/api/iuran-types", headers=auth_headers(admin2_token)).json()
+    a2_names = {i["nama"] for i in a2_list}
+    assert "Iuran Jalan" in a2_names
+    assert "Iuran Kas" not in a2_names
+
+    # Ketua sees BOTH
+    ketua_list = client.get("/api/iuran-types", headers=auth_headers(ketua_token)).json()
+    ketua_names = {i["nama"] for i in ketua_list}
+    assert "Iuran Kas" in ketua_names
+    assert "Iuran Jalan" in ketua_names
+
+    # Admin 2 generates tagihan for Jalan
+    gen_jalan = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran_jalan["id"], "periode": "2026-10"},
+        headers=auth_headers(admin2_token),
+    )
+    assert gen_jalan.status_code == 201
+    tagihan_jalan_id = gen_jalan.json()[0]["id"]
+
+    # Admin 1 attempts to generate tagihan for Jalan -> 403 Forbidden!
+    gen_forbidden = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran_jalan["id"], "periode": "2026-11"},
+        headers=auth_headers(admin1_token),
+    )
+    assert gen_forbidden.status_code == 403
+
+    # Admin 1 attempts to pay tagihan Jalan -> 403 Forbidden!
+    pay_forbidden = client.post(
+        f"/api/tagihan/{tagihan_jalan_id}/pay",
+        json={"payment_method": "tunai"},
+        headers=auth_headers(admin1_token),
+    )
+    assert pay_forbidden.status_code == 403
+
+    # Admin 1 attempts to batch-pay tagihan Jalan -> 403 Forbidden!
+    batch_forbidden = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [tagihan_jalan_id], "payment_method": "tunai"},
+        headers=auth_headers(admin1_token),
+    )
+    assert batch_forbidden.status_code == 403
+
+    # Admin 1 list_tagihan does NOT see tagihan Jalan
+    a1_tagihan = client.get(
+        "/api/tagihan", params={"periode": "2026-10"}, headers=auth_headers(admin1_token)
+    ).json()
+    assert all(t["iuran_type_id"] != iuran_jalan["id"] for t in a1_tagihan)
+
+    # Admin 2 list_tagihan DOES see tagihan Jalan
+    a2_tagihan = client.get(
+        "/api/tagihan", params={"periode": "2026-10"}, headers=auth_headers(admin2_token)
+    ).json()
+    assert any(t["id"] == tagihan_jalan_id for t in a2_tagihan)
+
+    # Ketua can reassign "Iuran Jalan" from Admin 2 to Admin 1
+    reassign_resp = client.patch(
+        f"/api/iuran-types/{iuran_jalan['id']}/reassign",
+        json={"admin_id": admin_setup["admin_token"] and a1_list[0]["admin_id"]},
+        headers=auth_headers(ketua_token),
+    )
+    assert reassign_resp.status_code == 200
+
+    # Now Admin 1 CAN pay it
+    pay_success = client.post(
+        f"/api/tagihan/{tagihan_jalan_id}/pay",
+        json={"payment_method": "tunai"},
+        headers=auth_headers(admin1_token),
+    )
+    assert pay_success.status_code == 200

@@ -13,22 +13,34 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export function setSession({ access_token, role, komunitas_id }: TokenResponse): void {
+export function setSession({
+  access_token,
+  role,
+  komunitas_id,
+  user_id,
+  username,
+}: TokenResponse): void {
   localStorage.setItem("kas_token", access_token);
   localStorage.setItem("kas_role", role);
   localStorage.setItem("kas_komunitas_id", komunitas_id);
+  if (user_id) localStorage.setItem("kas_user_id", user_id);
+  if (username) localStorage.setItem("kas_username", username);
 }
 
 export function clearSession(): void {
   localStorage.removeItem("kas_token");
   localStorage.removeItem("kas_role");
   localStorage.removeItem("kas_komunitas_id");
+  localStorage.removeItem("kas_user_id");
+  localStorage.removeItem("kas_username");
 }
 
 export interface Session {
   token: string | null;
   role: string | null;
   komunitasId: string | null;
+  userId: string | null;
+  username: string | null;
 }
 
 export function getSession(): Session {
@@ -36,6 +48,8 @@ export function getSession(): Session {
     token: localStorage.getItem("kas_token"),
     role: localStorage.getItem("kas_role"),
     komunitasId: localStorage.getItem("kas_komunitas_id"),
+    userId: localStorage.getItem("kas_user_id"),
+    username: localStorage.getItem("kas_username"),
   };
 }
 

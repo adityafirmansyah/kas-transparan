@@ -122,9 +122,11 @@ class IuranType(Base):
     nominal = Column(Float, nullable=False)
     period_type = Column(SAEnum(PeriodType), nullable=False, default=PeriodType.monthly)
     aktif = Column(Boolean, default=True)
+    admin_id = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     komunitas = relationship("Komunitas", back_populates="iuran_types")
+    admin_user = relationship("User", foreign_keys=[admin_id])
     tagihan = relationship("Tagihan", back_populates="iuran_type", cascade="all, delete-orphan")
 
 

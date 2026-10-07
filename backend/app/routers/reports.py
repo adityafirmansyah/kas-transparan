@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import KasEntry, PengeluaranStatus, Tagihan, TagihanStatus, User
+from app.models.models import IuranType, KasEntry, PengeluaranStatus, Tagihan, TagihanStatus, User
 from app.schemas.schemas import (
     MonthlyReport,
     TunggakanMultiOut,
@@ -63,15 +63,16 @@ def unpaid_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    rows = (
-        db.query(Tagihan)
-        .filter(
-            Tagihan.komunitas_id == user.komunitas_id,
-            Tagihan.periode == periode,
-            Tagihan.status == TagihanStatus.belum_bayar,
-        )
-        .all()
+    query = db.query(Tagihan).filter(
+        Tagihan.komunitas_id == user.komunitas_id,
+        Tagihan.periode == periode,
+        Tagihan.status == TagihanStatus.belum_bayar,
     )
+    if user.role.value == "admin":
+        query = query.join(Tagihan.iuran_type).filter(
+            (IuranType.admin_id == user.id) | (IuranType.admin_id.is_(None))
+        )
+    rows = query.all()
 
     return [
         UnpaidWargaOut(
@@ -97,17 +98,17 @@ def tunggakan_multi(
     `periode` strings are "YYYY-MM" which sort lexicographically, so a plain
     string BETWEEN comparison is sufficient to express the date range.
     """
-    rows = (
-        db.query(Tagihan)
-        .filter(
-            Tagihan.komunitas_id == user.komunitas_id,
-            Tagihan.periode >= periode_start,
-            Tagihan.periode <= periode_end,
-            Tagihan.status == TagihanStatus.belum_bayar,
-        )
-        .order_by(Tagihan.periode)
-        .all()
+    query = db.query(Tagihan).filter(
+        Tagihan.komunitas_id == user.komunitas_id,
+        Tagihan.periode >= periode_start,
+        Tagihan.periode <= periode_end,
+        Tagihan.status == TagihanStatus.belum_bayar,
     )
+    if user.role.value == "admin":
+        query = query.join(Tagihan.iuran_type).filter(
+            (IuranType.admin_id == user.id) | (IuranType.admin_id.is_(None))
+        )
+    rows = query.order_by(Tagihan.periode).all()
 
     grouped: dict[str, dict] = {}
     for t in rows:

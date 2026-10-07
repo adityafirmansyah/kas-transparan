@@ -18,6 +18,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     komunitas_id: str
+    user_id: str | None = None
+    username: str | None = None
 
 
 class UserCreate(BaseModel):
@@ -113,6 +115,12 @@ class IuranTypeOut(BaseModel):
     nominal: float
     period_type: str
     aktif: bool
+    admin_id: str | None = None
+    admin_username: str | None = None
+
+
+class IuranTypeReassignRequest(BaseModel):
+    admin_id: str
 
 
 # ---------- Tagihan ----------
