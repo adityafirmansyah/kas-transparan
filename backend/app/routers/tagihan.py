@@ -288,10 +288,7 @@ def record_future_payment(
 
         if tagihan:
             if tagihan.status == TagihanStatus.lunas:
-                msg = (
-                    f"Tagihan {iuran.nama} periode {item.periode} "
-                    f"untuk {warga.nama} sudah lunas"
-                )
+                msg = f"Tagihan {iuran.nama} periode {item.periode} untuk {warga.nama} sudah lunas"
                 raise HTTPException(status_code=400, detail=msg)
             tagihan.status = TagihanStatus.lunas
             tagihan.payment_method = method
@@ -315,9 +312,7 @@ def record_future_payment(
             komunitas_id=user.komunitas_id,
             tipe="pemasukan",
             kategori="iuran",
-            deskripsi=(
-                f"Pembayaran {iuran.nama} - {warga.nama} ({item.periode})"
-            ),
+            deskripsi=(f"Pembayaran {iuran.nama} - {warga.nama} ({item.periode})"),
             nominal=iuran.nominal,
             tagihan_id=tagihan.id,
             created_by=user.id,
