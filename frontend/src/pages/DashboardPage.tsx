@@ -294,7 +294,11 @@ export default function DashboardPage(): ReactElement {
 
         {/* Tab Content Section */}
         <div className="transition-opacity duration-200">
-          {tab === "Warga" && <WargaTab onNavigateToTagihanFuture={handleNavigateToFuturePay} />}
+          {tab === "Warga" && (
+            <WargaTab
+              onNavigateToTagihanFuture={role === "admin" ? handleNavigateToFuturePay : undefined}
+            />
+          )}
           {tab === "Iuran" && <IuranTab />}
           {tab === "Tagihan" && (
             <TagihanTab
