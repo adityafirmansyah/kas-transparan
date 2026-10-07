@@ -25,6 +25,8 @@ from app.models.models import (
     Warga,
 )
 from app.schemas.schemas import (
+    BatchPayTagihanRequest,
+    BatchPayTagihanResponse,
     GenerateTagihanRequest,
     PayTagihanRequest,
     TagihanOut,
@@ -151,3 +153,72 @@ def pay_tagihan(
     db.commit()
     db.refresh(tagihan)
     return tagihan
+
+
+@router.post("/batch-pay", response_model=BatchPayTagihanResponse)
+def batch_pay_tagihan(
+    payload: BatchPayTagihanRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    if not payload.tagihan_ids:
+        raise HTTPException(status_code=400, detail="Daftar tagihan tidak boleh kosong")
+
+    # Fetch all tagihan in one query
+    tagihans = (
+        db.query(Tagihan)
+        .filter(
+            Tagihan.id.in_(payload.tagihan_ids),
+            Tagihan.komunitas_id == user.komunitas_id,
+        )
+        .all()
+    )
+
+    if len(tagihans) != len(payload.tagihan_ids):
+        raise HTTPException(
+            status_code=404,
+            detail="Beberapa tagihan tidak ditemukan atau tidak memiliki akses",
+        )
+
+    for t in tagihans:
+        if t.status == TagihanStatus.lunas:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Tagihan {t.iuran_type.nama} ({t.periode}) untuk {t.warga.nama} sudah lunas"
+                ),
+            )
+
+    now = datetime.utcnow()
+    method = PaymentMethod(payload.payment_method)
+    paid_list = []
+    total_nominal = 0.0
+
+    for t in tagihans:
+        t.status = TagihanStatus.lunas
+        t.payment_method = method
+        t.proof_image_path = payload.proof_image_path
+        t.paid_at = now
+
+        kas_entry = KasEntry(
+            komunitas_id=user.komunitas_id,
+            tipe="pemasukan",
+            kategori="iuran",
+            deskripsi=(f"Pembayaran {t.iuran_type.nama} - {t.warga.nama} ({t.periode})"),
+            nominal=t.nominal,
+            tagihan_id=t.id,
+            created_by=user.id,
+        )
+        db.add(kas_entry)
+        total_nominal += t.nominal
+        paid_list.append(t)
+
+    db.commit()
+    for t in paid_list:
+        db.refresh(t)
+
+    return BatchPayTagihanResponse(
+        paid_count=len(paid_list),
+        total_nominal=total_nominal,
+        paid_tagihan=paid_list,
+    )

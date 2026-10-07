@@ -59,6 +59,13 @@ function shiftPeriode(periode: string, delta: number): string {
   return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
 }
 
+interface PayingBatchItem {
+  id: string;
+  warga_nama: string;
+  iuran_nama: string;
+  periode: string;
+  nominal: number;
+}
 type FilterStatus = "semua" | "lunas" | "belum_bayar";
 type ViewMode = "single" | "multi";
 
@@ -94,10 +101,13 @@ export default function TagihanTab(): ReactElement {
   const [generating, setGenerating] = useState(false);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("semua");
 
-  // Payment Modal State
-  const [payingTagihan, setPayingTagihan] = useState<TagihanWithWarga | null>(null);
+  // Payment Modal State (supports single or multi-bill batch payment)
+  const [payingItems, setPayingItems] = useState<PayingBatchItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
   const [payingLoading, setPayingLoading] = useState(false);
+
+  // Checkbox selection state for single-period view
+  const [selectedTagihanIds, setSelectedTagihanIds] = useState<string[]>([]);
 
   // View mode: single-period tagihan view vs multi-month arrears (tunggakan) view
   const [viewMode, setViewMode] = useState<ViewMode>("single");
@@ -167,16 +177,85 @@ export default function TagihanTab(): ReactElement {
   }
 
   async function handleConfirmPay(): Promise<void> {
-    if (!payingTagihan) return;
+    if (payingItems.length === 0) return;
     setPayingLoading(true);
     try {
-      await api.post(`/api/tagihan/${payingTagihan.id}/pay`, { payment_method: paymentMethod });
-      setPayingTagihan(null);
+      if (payingItems.length === 1) {
+        await api.post(`/api/tagihan/${payingItems[0].id}/pay`, { payment_method: paymentMethod });
+      } else {
+        await api.post("/api/tagihan/batch-pay", {
+          tagihan_ids: payingItems.map((p) => p.id),
+          payment_method: paymentMethod,
+        });
+      }
+      setPayingItems([]);
+      setSelectedTagihanIds([]);
+      setMessage(
+        `${payingItems.length} tagihan (${formatRupiah(payingItems.reduce((acc, p) => acc + p.nominal, 0))}) berhasil ditandai lunas.`
+      );
       loadTagihan();
+      if (viewMode === "multi") loadTunggakanMulti();
     } catch (err) {
       setError(errorMessage(err, "Gagal mencatat pembayaran"));
     } finally {
       setPayingLoading(false);
+    }
+  }
+
+  function openSinglePay(t: TagihanWithWarga): void {
+    setPayingItems([
+      {
+        id: t.id,
+        warga_nama: t.warga_nama,
+        iuran_nama: t.iuran_nama,
+        periode: t.periode,
+        nominal: t.nominal,
+      },
+    ]);
+  }
+
+  function openBatchPaySelected(): void {
+    const selected = tagihanList.filter(
+      (t) => selectedTagihanIds.includes(t.id) && t.status === "belum_bayar"
+    );
+    if (selected.length === 0) return;
+    setPayingItems(
+      selected.map((t) => ({
+        id: t.id,
+        warga_nama: t.warga_nama,
+        iuran_nama: t.iuran_nama,
+        periode: t.periode,
+        nominal: t.nominal,
+      }))
+    );
+  }
+
+  function openPayAllWargaTunggakan(w: TunggakanMulti): void {
+    setPayingItems(
+      w.unpaid_periods.map((p) => ({
+        id: p.tagihan_id,
+        warga_nama: w.warga_nama,
+        iuran_nama: p.iuran_nama,
+        periode: p.periode,
+        nominal: p.nominal,
+      }))
+    );
+  }
+
+  function toggleSelectTagihan(id: string): void {
+    setSelectedTagihanIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAllUnpaid(): void {
+    const unpaidIds = filteredTagihan.filter((t) => t.status === "belum_bayar").map((t) => t.id);
+    const allSelected =
+      unpaidIds.length > 0 && unpaidIds.every((id) => selectedTagihanIds.includes(id));
+    if (allSelected) {
+      setSelectedTagihanIds((prev) => prev.filter((id) => !unpaidIds.includes(id)));
+    } else {
+      setSelectedTagihanIds((prev) => Array.from(new Set([...prev, ...unpaidIds])));
     }
   }
 
@@ -377,9 +456,9 @@ export default function TagihanTab(): ReactElement {
             </div>
           </div>
 
-          {/* Filter Tabs Bar */}
+          {/* Filter Tabs Bar & Batch Pay Bar */}
           <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <Filter className="w-4 h-4 text-slate-400 ml-2 mr-1" />
               <button
                 onClick={() => setFilterStatus("semua")}
@@ -411,11 +490,41 @@ export default function TagihanTab(): ReactElement {
               >
                 Belum Bayar ({totalBelum})
               </button>
+
+              {totalBelum > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectAllUnpaid}
+                  className="text-xs px-2.5 py-1 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition ml-2 font-medium"
+                >
+                  {selectedTagihanIds.length > 0 ? "Batal Pilih" : "Pilih Semua Belum Bayar"}
+                </button>
+              )}
             </div>
 
-            <span className="text-xs text-slate-400 pr-2">
-              Periode {formatPeriodeLabel(periode)}
-            </span>
+            <div className="flex items-center gap-3">
+              {selectedTagihanIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={openBatchPaySelected}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm transition animate-in fade-in"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>
+                    Bayar Terpilih ({selectedTagihanIds.length} Tagihan &bull;{" "}
+                    {formatRupiah(
+                      tagihanList
+                        .filter((t) => selectedTagihanIds.includes(t.id))
+                        .reduce((acc, t) => acc + t.nominal, 0)
+                    )}
+                    )
+                  </span>
+                </button>
+              )}
+              <span className="text-xs text-slate-400 pr-2">
+                Periode {formatPeriodeLabel(periode)}
+              </span>
+            </div>
           </div>
 
           {/* Tagihan Table (desktop/tablet) */}
@@ -424,6 +533,20 @@ export default function TagihanTab(): ReactElement {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filteredTagihan.filter((t) => t.status === "belum_bayar").length > 0 &&
+                          filteredTagihan
+                            .filter((t) => t.status === "belum_bayar")
+                            .every((t) => selectedTagihanIds.includes(t.id))
+                        }
+                        onChange={toggleSelectAllUnpaid}
+                        className="rounded text-emerald-600 focus:ring-emerald-500"
+                        title="Pilih semua tagihan belum bayar"
+                      />
+                    </th>
                     <th className="py-3 px-4">Nama Warga</th>
                     <th className="py-3 px-4">Jenis Iuran</th>
                     <th className="py-3 px-4">Nominal</th>
@@ -435,21 +558,21 @@ export default function TagihanTab(): ReactElement {
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-500">
+                      <td colSpan={7} className="py-10 text-center text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
                         <span>Memuat tagihan...</span>
                       </td>
                     </tr>
                   ) : filteredTagihan.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500">
+                      <td colSpan={7} className="py-12 text-center text-slate-500">
                         <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <p className="font-semibold text-slate-700">
                           Tidak ada tagihan untuk kriteria ini
                         </p>
                         <p className="text-xs text-slate-400 mt-1">
-                          Klik "Generate Tagihan Bulan Ini" untuk membuat tagihan otomatis ke
-                          seluruh warga aktif.
+                          Klik &quot;Generate Tagihan Bulan Ini&quot; untuk membuat tagihan otomatis
+                          ke seluruh warga aktif.
                         </p>
                       </td>
                     </tr>
@@ -462,6 +585,18 @@ export default function TagihanTab(): ReactElement {
                             group.items.length > 1 ? "bg-emerald-50/30" : ""
                           }`}
                         >
+                          <td className="py-3.5 px-3 text-center">
+                            {t.status === "belum_bayar" ? (
+                              <input
+                                type="checkbox"
+                                checked={selectedTagihanIds.includes(t.id)}
+                                onChange={() => toggleSelectTagihan(t.id)}
+                                className="rounded text-emerald-600 focus:ring-emerald-500"
+                              />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                            )}
+                          </td>
                           <td className="py-3.5 px-4 font-semibold text-slate-900">
                             <div className="flex items-center gap-2">
                               <span>{t.warga_nama}</span>
@@ -517,7 +652,7 @@ export default function TagihanTab(): ReactElement {
                           <td className="py-3.5 px-4 text-right">
                             {t.status === "belum_bayar" ? (
                               <button
-                                onClick={() => setPayingTagihan(t)}
+                                onClick={() => openSinglePay(t)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
                               >
                                 <Check className="w-3.5 h-3.5" />
@@ -599,10 +734,18 @@ export default function TagihanTab(): ReactElement {
                             )}
                           </span>
                         </div>
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-2">
+                          {t.status === "belum_bayar" && (
+                            <input
+                              type="checkbox"
+                              checked={selectedTagihanIds.includes(t.id)}
+                              onChange={() => toggleSelectTagihan(t.id)}
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                            />
+                          )}
                           {t.status === "belum_bayar" ? (
                             <button
-                              onClick={() => setPayingTagihan(t)}
+                              onClick={() => openSinglePay(t)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
                             >
                               <Check className="w-3.5 h-3.5" />
@@ -634,17 +777,22 @@ export default function TagihanTab(): ReactElement {
           loading={tunggakanLoading}
           error={tunggakanError}
           onDismissError={() => setTunggakanError("")}
+          onPayWarga={openPayAllWargaTunggakan}
         />
       )}
 
-      {/* Payment Confirmation Modal */}
-      {payingTagihan && (
+      {/* Payment Confirmation Modal (Single or Multi/Batch) */}
+      {payingItems.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-base">Catat Pembayaran Iuran</h3>
+              <h3 className="font-bold text-slate-900 text-base">
+                {payingItems.length > 1
+                  ? "Konfirmasi Pembayaran Kolektif"
+                  : "Catat Pembayaran Iuran"}
+              </h3>
               <button
-                onClick={() => setPayingTagihan(null)}
+                onClick={() => setPayingItems([])}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
                 <X className="w-4 h-4" />
@@ -652,19 +800,49 @@ export default function TagihanTab(): ReactElement {
             </div>
 
             <div className="my-4 space-y-3">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Warga:</span>
-                  <span className="font-bold text-slate-900">{payingTagihan.warga_nama}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Iuran:</span>
-                  <span className="font-medium text-slate-800">{payingTagihan.iuran_nama}</span>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-slate-200">
-                  <span className="text-slate-500">Jumlah Tagihan:</span>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                {payingItems.length === 1 ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Warga:</span>
+                      <span className="font-bold text-slate-900">{payingItems[0].warga_nama}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Iuran &amp; Periode:</span>
+                      <span className="font-medium text-slate-800">
+                        {payingItems[0].iuran_nama} ({formatPeriodeLabel(payingItems[0].periode)})
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center pb-1 border-b border-slate-200">
+                      <span className="text-slate-500">Warga:</span>
+                      <span className="font-bold text-slate-900">
+                        {Array.from(new Set(payingItems.map((p) => p.warga_nama))).join(", ")}
+                      </span>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                      {payingItems.map((item, idx) => (
+                        <div key={`${item.id}-${idx}`} className="flex justify-between text-[11px]">
+                          <span className="text-slate-600 truncate mr-2">
+                            {item.warga_nama} &bull; {item.iuran_nama} (
+                            {formatPeriodeLabel(item.periode)})
+                          </span>
+                          <span className="font-mono font-semibold text-slate-800 shrink-0">
+                            {formatRupiah(item.nominal)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between pt-2 border-t border-slate-200">
+                  <span className="text-slate-700 font-semibold">
+                    Total Bayar ({payingItems.length} Tagihan):
+                  </span>
                   <span className="font-mono font-bold text-emerald-700 text-sm">
-                    {formatRupiah(payingTagihan.nominal)}
+                    {formatRupiah(payingItems.reduce((acc, p) => acc + p.nominal, 0))}
                   </span>
                 </div>
               </div>
@@ -706,7 +884,7 @@ export default function TagihanTab(): ReactElement {
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setPayingTagihan(null)}
+                onClick={() => setPayingItems([])}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-slate-50"
               >
                 Batal
@@ -718,7 +896,7 @@ export default function TagihanTab(): ReactElement {
                 className="px-4 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
               >
                 {payingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Konfirmasi Lunas</span>
+                <span>Konfirmasi Lunas ({payingItems.length})</span>
               </button>
             </div>
           </div>
@@ -737,6 +915,7 @@ interface TunggakanMultiSectionProps {
   loading: boolean;
   error: string;
   onDismissError: () => void;
+  onPayWarga: (w: TunggakanMulti) => void;
 }
 
 /**
@@ -754,6 +933,7 @@ function TunggakanMultiSection({
   loading,
   error,
   onDismissError,
+  onPayWarga,
 }: TunggakanMultiSectionProps): ReactElement {
   const totalWargaNunggak = data.length;
   const totalNominalTunggakan = data.reduce((acc, d) => acc + d.total_nominal, 0);
@@ -872,19 +1052,20 @@ function TunggakanMultiSection({
                 <th className="py-3 px-4 text-center">Bulan Nunggak</th>
                 <th className="py-3 px-4">Rincian Periode</th>
                 <th className="py-3 px-4 text-right">Total Tunggakan</th>
+                <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="py-10 text-center text-slate-500">
+                  <td colSpan={5} className="py-10 text-center text-slate-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
                     <span>Memuat data tunggakan...</span>
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-slate-500">
+                  <td colSpan={5} className="py-12 text-center text-slate-500">
                     <CheckCircle2 className="w-8 h-8 text-emerald-300 mx-auto mb-2" />
                     <p className="font-semibold text-slate-700">
                       Tidak ada warga yang menunggak pada rentang periode ini
@@ -925,6 +1106,16 @@ function TunggakanMultiSection({
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-700">
                       {formatRupiah(w.total_nominal)}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onPayWarga(w)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Bayar Semua ({w.total_unpaid_count})</span>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -987,6 +1178,19 @@ function TunggakanMultiSection({
                   <span className="font-mono font-bold text-rose-700 text-sm">
                     {formatRupiah(w.total_nominal)}
                   </span>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => onPayWarga(w)}
+                    className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>
+                      Bayar Semua ({w.total_unpaid_count} Tagihan &bull;{" "}
+                      {formatRupiah(w.total_nominal)})
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>

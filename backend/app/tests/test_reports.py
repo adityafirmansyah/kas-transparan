@@ -87,6 +87,7 @@ def test_tunggakan_multi_multiple_iuran_types_same_month(client, admin_setup):
     # 4 unpaid bills total, but spanning only 2 distinct calendar months
     assert entry["total_unpaid_count"] == 4
     assert entry["distinct_months_count"] == 2
+    assert all("tagihan_id" in p and p["tagihan_id"] for p in entry["unpaid_periods"])
     assert entry["total_nominal"] == 140000
 
 

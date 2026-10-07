@@ -115,7 +115,13 @@ class GenerateTagihanRequest(BaseModel):
 
 
 class PayTagihanRequest(BaseModel):
-    payment_method: Literal["tunai", "transfer"]
+    payment_method: str  # "tunai" or "transfer"
+    proof_image_path: str | None = None
+
+
+class BatchPayTagihanRequest(BaseModel):
+    tagihan_ids: list[str]
+    payment_method: str  # "tunai" or "transfer"
     proof_image_path: str | None = None
 
 
@@ -130,6 +136,12 @@ class TagihanOut(BaseModel):
     payment_method: str | None = None
     proof_image_path: str | None = None
     paid_at: datetime | None = None
+
+
+class BatchPayTagihanResponse(BaseModel):
+    paid_count: int
+    total_nominal: float
+    paid_tagihan: list[TagihanOut]
 
 
 class TagihanWithWargaOut(TagihanOut):
@@ -192,6 +204,7 @@ class UnpaidWargaOut(BaseModel):
 
 
 class TunggakanPeriodeOut(BaseModel):
+    tagihan_id: str
     periode: str
     iuran_nama: str
     nominal: float

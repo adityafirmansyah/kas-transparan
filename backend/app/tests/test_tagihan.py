@@ -117,3 +117,151 @@ def test_pay_already_paid_tagihan_fails(client, admin_setup):
         headers=auth_headers(token),
     )
     assert second_pay.status_code == 400
+
+
+def test_batch_pay_tagihan_success_across_periods_and_iuran(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran1 = _setup_warga_and_iuran(client, token, n_warga=2)
+
+    iuran2_resp = client.post(
+        "/api/iuran-types",
+        json={"nama": "Iuran Keamanan", "nominal": 30000, "period_type": "monthly"},
+        headers=auth_headers(token),
+    )
+    iuran2 = iuran2_resp.json()
+
+    gen1 = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran1["id"], "periode": "2025-01"},
+        headers=auth_headers(token),
+    ).json()
+
+    gen2 = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran2["id"], "periode": "2025-02"},
+        headers=auth_headers(token),
+    ).json()
+
+    # Collect 3 tagihan: 2 from gen1, 1 from gen2
+    selected_ids = [gen1[0]["id"], gen1[1]["id"], gen2[0]["id"]]
+    expected_total = 50000 + 50000 + 30000  # 130000
+
+    resp = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": selected_ids, "payment_method": "transfer"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["paid_count"] == 3
+    assert data["total_nominal"] == expected_total
+    assert len(data["paid_tagihan"]) == 3
+    for pt in data["paid_tagihan"]:
+        assert pt["status"] == "lunas"
+        assert pt["payment_method"] == "transfer"
+        assert pt["paid_at"] is not None
+
+    saldo_resp = client.get("/api/kas/saldo", headers=auth_headers(token))
+    assert saldo_resp.json()["saldo"] == expected_total
+
+
+def test_batch_pay_tagihan_empty_ids_fails(client, admin_setup):
+    token = admin_setup["admin_token"]
+    resp = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [], "payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 400
+    assert "kosong" in resp.json()["detail"].lower()
+
+
+def test_batch_pay_tagihan_invalid_ids_fails(client, admin_setup):
+    token = admin_setup["admin_token"]
+    resp = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": ["non-existent-id"], "payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 404
+
+
+def test_batch_pay_tagihan_already_paid_fails(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=2)
+    gen = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2025-06"},
+        headers=auth_headers(token),
+    ).json()
+
+    # Pay first one individually
+    client.post(
+        f"/api/tagihan/{gen[0]['id']}/pay",
+        json={"payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+
+    # Try batch pay both (one is already paid)
+    resp = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [gen[0]["id"], gen[1]["id"]], "payment_method": "tunai"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 400
+    assert "sudah lunas" in resp.json()["detail"].lower()
+
+
+def test_batch_pay_role_permissions(client, admin_setup):
+    admin_token = admin_setup["admin_token"]
+    ketua_token = admin_setup["ketua_token"]
+    komunitas_id = admin_setup["komunitas"]["id"]
+
+    # Create warga user
+    client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "warga_batch", "password": "secret123", "role": "warga"},
+    )
+    warga_login = client.post(
+        "/api/auth/login", json={"username": "warga_batch", "password": "secret123"}
+    )
+    warga_token = warga_login.json()["access_token"]
+
+    warga_ids, iuran = _setup_warga_and_iuran(client, admin_token, n_warga=1)
+    gen = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2025-07"},
+        headers=auth_headers(admin_token),
+    ).json()
+    tagihan_id = gen[0]["id"]
+
+    # Ketua rejected
+    resp_ketua = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [tagihan_id], "payment_method": "tunai"},
+        headers=auth_headers(ketua_token),
+    )
+    assert resp_ketua.status_code == 403
+
+    # Warga rejected
+    resp_warga = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [tagihan_id], "payment_method": "tunai"},
+        headers=auth_headers(warga_token),
+    )
+    assert resp_warga.status_code == 403
+
+    # Unauthenticated rejected
+    resp_unauth = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [tagihan_id], "payment_method": "tunai"},
+    )
+    assert resp_unauth.status_code == 401
+
+    # Admin succeeds
+    resp_admin = client.post(
+        "/api/tagihan/batch-pay",
+        json={"tagihan_ids": [tagihan_id], "payment_method": "tunai"},
+        headers=auth_headers(admin_token),
+    )
+    assert resp_admin.status_code == 200

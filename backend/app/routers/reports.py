@@ -117,6 +117,7 @@ def tunggakan_multi(
         )
         entry["unpaid_periods"].append(
             TunggakanPeriodeOut(
+                tagihan_id=t.id,
                 periode=t.periode,
                 iuran_nama=t.iuran_type.nama,
                 nominal=t.nominal,
