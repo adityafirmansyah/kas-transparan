@@ -1,12 +1,12 @@
 """Internal reports: monthly summary + list of warga who haven't paid."""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import KasEntry, Tagihan, User, TagihanStatus, PengeluaranStatus
+from app.models.models import KasEntry, PengeluaranStatus, Tagihan, TagihanStatus, User
 from app.schemas.schemas import MonthlyReport, UnpaidWargaOut
-from app.routers.kas import compute_saldo
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -17,9 +17,13 @@ def monthly_report(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    entries = db.query(KasEntry).filter(
-        KasEntry.komunitas_id == user.komunitas_id,
-    ).all()
+    entries = (
+        db.query(KasEntry)
+        .filter(
+            KasEntry.komunitas_id == user.komunitas_id,
+        )
+        .all()
+    )
 
     total_masuk = 0.0
     total_keluar = 0.0
@@ -54,11 +58,15 @@ def unpaid_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    rows = db.query(Tagihan).filter(
-        Tagihan.komunitas_id == user.komunitas_id,
-        Tagihan.periode == periode,
-        Tagihan.status == TagihanStatus.belum_bayar,
-    ).all()
+    rows = (
+        db.query(Tagihan)
+        .filter(
+            Tagihan.komunitas_id == user.komunitas_id,
+            Tagihan.periode == periode,
+            Tagihan.status == TagihanStatus.belum_bayar,
+        )
+        .all()
+    )
 
     return [
         UnpaidWargaOut(

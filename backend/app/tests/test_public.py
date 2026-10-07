@@ -1,4 +1,5 @@
 """Tests: public transparency page requires no auth and hides warga PII."""
+
 import json
 
 
@@ -22,15 +23,21 @@ def test_public_summary_reflects_aggregate_numbers_only(client, admin_setup):
     ketua_token = admin_setup["ketua_token"]
     slug = admin_setup["komunitas"]["slug"]
 
-    client.post("/api/kas/pemasukan", json={
-        "kategori": "donasi", "deskripsi": "Donasi dari Budi Santoso", "nominal": 100000
-    }, headers=auth_headers(admin_token))
-    pengeluaran_resp = client.post("/api/kas/pengeluaran", json={
-        "kategori": "kebersihan", "deskripsi": "Beli sapu dan pel", "nominal": 40000
-    }, headers=auth_headers(admin_token))
-    client.post(f"/api/kas/pengeluaran/{pengeluaran_resp.json()['id']}/approval", json={
-        "status": "approved"
-    }, headers=auth_headers(ketua_token))
+    client.post(
+        "/api/kas/pemasukan",
+        json={"kategori": "donasi", "deskripsi": "Donasi dari Budi Santoso", "nominal": 100000},
+        headers=auth_headers(admin_token),
+    )
+    pengeluaran_resp = client.post(
+        "/api/kas/pengeluaran",
+        json={"kategori": "kebersihan", "deskripsi": "Beli sapu dan pel", "nominal": 40000},
+        headers=auth_headers(admin_token),
+    )
+    client.post(
+        f"/api/kas/pengeluaran/{pengeluaran_resp.json()['id']}/approval",
+        json={"status": "approved"},
+        headers=auth_headers(ketua_token),
+    )
 
     resp = client.get(f"/api/public/{slug}/summary")
     body = resp.json()
@@ -47,12 +54,16 @@ def test_public_summary_excludes_pending_pengeluaran(client, admin_setup):
     admin_token = admin_setup["admin_token"]
     slug = admin_setup["komunitas"]["slug"]
 
-    client.post("/api/kas/pemasukan", json={
-        "kategori": "donasi", "deskripsi": "Donasi", "nominal": 100000
-    }, headers=auth_headers(admin_token))
-    client.post("/api/kas/pengeluaran", json={
-        "kategori": "lainnya", "deskripsi": "Belum disetujui", "nominal": 20000
-    }, headers=auth_headers(admin_token))
+    client.post(
+        "/api/kas/pemasukan",
+        json={"kategori": "donasi", "deskripsi": "Donasi", "nominal": 100000},
+        headers=auth_headers(admin_token),
+    )
+    client.post(
+        "/api/kas/pengeluaran",
+        json={"kategori": "lainnya", "deskripsi": "Belum disetujui", "nominal": 20000},
+        headers=auth_headers(admin_token),
+    )
 
     resp = client.get(f"/api/public/{slug}/summary")
     body = resp.json()

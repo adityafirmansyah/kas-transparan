@@ -7,15 +7,28 @@ Core logic:
 - pay_tagihan: marks a tagihan lunas and creates a matching pemasukan
   KasEntry so the buku kas ledger stays in sync automatically.
 """
+
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import Tagihan, Warga, IuranType, User, TagihanStatus, KasEntry, PaymentMethod
+from app.models.models import (
+    IuranType,
+    KasEntry,
+    PaymentMethod,
+    Tagihan,
+    TagihanStatus,
+    User,
+    Warga,
+)
 from app.schemas.schemas import (
-    GenerateTagihanRequest, PayTagihanRequest, TagihanOut, TagihanWithWargaOut
+    GenerateTagihanRequest,
+    PayTagihanRequest,
+    TagihanOut,
+    TagihanWithWargaOut,
 )
 
 router = APIRouter(prefix="/api/tagihan", tags=["tagihan"])
@@ -27,21 +40,23 @@ def generate_tagihan(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
-    iuran_type = db.query(IuranType).filter(
-        IuranType.id == payload.iuran_type_id, IuranType.komunitas_id == user.komunitas_id
-    ).first()
+    iuran_type = (
+        db.query(IuranType)
+        .filter(IuranType.id == payload.iuran_type_id, IuranType.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not iuran_type:
         raise HTTPException(status_code=404, detail="Iuran type tidak ditemukan")
 
-    active_warga = db.query(Warga).filter(
-        Warga.komunitas_id == user.komunitas_id, Warga.aktif.is_(True)
-    ).all()
+    active_warga = (
+        db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id, Warga.aktif.is_(True)).all()
+    )
 
     existing_warga_ids = {
         t.warga_id
-        for t in db.query(Tagihan).filter(
-            Tagihan.iuran_type_id == iuran_type.id, Tagihan.periode == payload.periode
-        ).all()
+        for t in db.query(Tagihan)
+        .filter(Tagihan.iuran_type_id == iuran_type.id, Tagihan.periode == payload.periode)
+        .all()
     }
 
     created = []
@@ -81,13 +96,21 @@ def list_tagihan(
 
     results = []
     for t in rows:
-        results.append(TagihanWithWargaOut(
-            id=t.id, warga_id=t.warga_id, iuran_type_id=t.iuran_type_id,
-            periode=t.periode, nominal=t.nominal, status=t.status.value,
-            payment_method=t.payment_method.value if t.payment_method else None,
-            proof_image_path=t.proof_image_path, paid_at=t.paid_at,
-            warga_nama=t.warga.nama, iuran_nama=t.iuran_type.nama,
-        ))
+        results.append(
+            TagihanWithWargaOut(
+                id=t.id,
+                warga_id=t.warga_id,
+                iuran_type_id=t.iuran_type_id,
+                periode=t.periode,
+                nominal=t.nominal,
+                status=t.status.value,
+                payment_method=t.payment_method.value if t.payment_method else None,
+                proof_image_path=t.proof_image_path,
+                paid_at=t.paid_at,
+                warga_nama=t.warga.nama,
+                iuran_nama=t.iuran_type.nama,
+            )
+        )
     return results
 
 
@@ -98,9 +121,11 @@ def pay_tagihan(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
-    tagihan = db.query(Tagihan).filter(
-        Tagihan.id == tagihan_id, Tagihan.komunitas_id == user.komunitas_id
-    ).first()
+    tagihan = (
+        db.query(Tagihan)
+        .filter(Tagihan.id == tagihan_id, Tagihan.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not tagihan:
         raise HTTPException(status_code=404, detail="Tagihan tidak ditemukan")
     if tagihan.status == TagihanStatus.lunas:
@@ -115,7 +140,9 @@ def pay_tagihan(
         komunitas_id=user.komunitas_id,
         tipe="pemasukan",
         kategori="iuran",
-        deskripsi=f"Pembayaran {tagihan.iuran_type.nama} - {tagihan.warga.nama} ({tagihan.periode})",
+        deskripsi=(
+            f"Pembayaran {tagihan.iuran_type.nama} - {tagihan.warga.nama} ({tagihan.periode})"
+        ),
         nominal=tagihan.nominal,
         tagihan_id=tagihan.id,
         created_by=user.id,

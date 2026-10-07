@@ -1,11 +1,12 @@
 """Pydantic request/response schemas."""
-from datetime import datetime, date
-from typing import Optional, Literal
+
+from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
 # ---------- Auth ----------
+
 
 class LoginRequest(BaseModel):
     username: str
@@ -35,10 +36,11 @@ class UserOut(BaseModel):
 
 # ---------- Komunitas ----------
 
+
 class KomunitasCreate(BaseModel):
     nama: str
     slug: str
-    alamat: Optional[str] = None
+    alamat: str | None = None
 
 
 class KomunitasOut(BaseModel):
@@ -46,38 +48,40 @@ class KomunitasOut(BaseModel):
     id: str
     nama: str
     slug: str
-    alamat: Optional[str] = None
+    alamat: str | None = None
 
 
 # ---------- Warga ----------
 
+
 class WargaCreate(BaseModel):
     nama: str
-    no_hp: Optional[str] = None
-    alamat: Optional[str] = None
-    no_rumah: Optional[str] = None
+    no_hp: str | None = None
+    alamat: str | None = None
+    no_rumah: str | None = None
     aktif: bool = True
 
 
 class WargaUpdate(BaseModel):
-    nama: Optional[str] = None
-    no_hp: Optional[str] = None
-    alamat: Optional[str] = None
-    no_rumah: Optional[str] = None
-    aktif: Optional[bool] = None
+    nama: str | None = None
+    no_hp: str | None = None
+    alamat: str | None = None
+    no_rumah: str | None = None
+    aktif: bool | None = None
 
 
 class WargaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
     nama: str
-    no_hp: Optional[str] = None
-    alamat: Optional[str] = None
-    no_rumah: Optional[str] = None
+    no_hp: str | None = None
+    alamat: str | None = None
+    no_rumah: str | None = None
     aktif: bool
 
 
 # ---------- IuranType ----------
+
 
 class IuranTypeCreate(BaseModel):
     nama: str
@@ -97,6 +101,7 @@ class IuranTypeOut(BaseModel):
 
 # ---------- Tagihan ----------
 
+
 class GenerateTagihanRequest(BaseModel):
     iuran_type_id: str
     periode: str  # "YYYY-MM"
@@ -104,7 +109,7 @@ class GenerateTagihanRequest(BaseModel):
 
 class PayTagihanRequest(BaseModel):
     payment_method: Literal["tunai", "transfer"]
-    proof_image_path: Optional[str] = None
+    proof_image_path: str | None = None
 
 
 class TagihanOut(BaseModel):
@@ -115,9 +120,9 @@ class TagihanOut(BaseModel):
     periode: str
     nominal: float
     status: str
-    payment_method: Optional[str] = None
-    proof_image_path: Optional[str] = None
-    paid_at: Optional[datetime] = None
+    payment_method: str | None = None
+    proof_image_path: str | None = None
+    paid_at: datetime | None = None
 
 
 class TagihanWithWargaOut(TagihanOut):
@@ -127,19 +132,20 @@ class TagihanWithWargaOut(TagihanOut):
 
 # ---------- KasEntry ----------
 
+
 class PemasukanCreate(BaseModel):
     kategori: str
     deskripsi: str
     nominal: float
-    tanggal: Optional[date] = None
+    tanggal: date | None = None
 
 
 class PengeluaranCreate(BaseModel):
     kategori: str
     deskripsi: str
     nominal: float
-    tanggal: Optional[date] = None
-    receipt_image_path: Optional[str] = None
+    tanggal: date | None = None
+    receipt_image_path: str | None = None
 
 
 class KasEntryOut(BaseModel):
@@ -150,8 +156,8 @@ class KasEntryOut(BaseModel):
     deskripsi: str
     nominal: float
     tanggal: date
-    receipt_image_path: Optional[str] = None
-    approval_status: Optional[str] = None
+    receipt_image_path: str | None = None
+    approval_status: str | None = None
     created_at: datetime
 
 
@@ -160,6 +166,7 @@ class ApprovalRequest(BaseModel):
 
 
 # ---------- Reports ----------
+
 
 class MonthlyReport(BaseModel):
     periode: str
@@ -179,6 +186,7 @@ class UnpaidWargaOut(BaseModel):
 
 # ---------- Public transparency ----------
 
+
 class PublicSummary(BaseModel):
     komunitas_nama: str
     saldo_akhir: float
@@ -194,4 +202,4 @@ class PublicLedgerEntry(BaseModel):
     nominal: float
     tanggal: date
     # deskripsi/warga identity intentionally omitted for privacy on pengeluaran->ok to show desc
-    deskripsi: Optional[str] = None
+    deskripsi: str | None = None

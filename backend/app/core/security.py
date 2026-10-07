@@ -1,7 +1,8 @@
 """JWT auth & password hashing helpers."""
-from datetime import datetime, timedelta, timezone
 
-from jose import jwt, JWTError
+from datetime import UTC, datetime, timedelta
+
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -19,7 +20,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(
+    expire = datetime.now(UTC) + timedelta(
         minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     to_encode.update({"exp": expire})

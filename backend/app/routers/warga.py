@@ -1,11 +1,12 @@
 """Warga (resident) CRUD, scoped to the authenticated admin's komunitas."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import Warga, User
-from app.schemas.schemas import WargaCreate, WargaUpdate, WargaOut
+from app.models.models import User, Warga
+from app.schemas.schemas import WargaCreate, WargaOut, WargaUpdate
 
 router = APIRouter(prefix="/api/warga", tags=["warga"])
 
@@ -28,7 +29,9 @@ def list_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    return db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id).order_by(Warga.nama).all()
+    return (
+        db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id).order_by(Warga.nama).all()
+    )
 
 
 @router.get("/{warga_id}", response_model=WargaOut)
@@ -37,7 +40,11 @@ def get_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    warga = db.query(Warga).filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id).first()
+    warga = (
+        db.query(Warga)
+        .filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not warga:
         raise HTTPException(status_code=404, detail="Warga tidak ditemukan")
     return warga
@@ -50,7 +57,11 @@ def update_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
-    warga = db.query(Warga).filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id).first()
+    warga = (
+        db.query(Warga)
+        .filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not warga:
         raise HTTPException(status_code=404, detail="Warga tidak ditemukan")
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -66,7 +77,11 @@ def delete_warga(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
-    warga = db.query(Warga).filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id).first()
+    warga = (
+        db.query(Warga)
+        .filter(Warga.id == warga_id, Warga.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not warga:
         raise HTTPException(status_code=404, detail="Warga tidak ditemukan")
     db.delete(warga)

@@ -7,13 +7,14 @@
   are excluded from saldo calculation.
 - Saldo = sum(pemasukan.nominal) - sum(pengeluaran.nominal where approved).
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import KasEntry, User, PengeluaranStatus
-from app.schemas.schemas import PemasukanCreate, PengeluaranCreate, KasEntryOut, ApprovalRequest
+from app.models.models import KasEntry, PengeluaranStatus, User
+from app.schemas.schemas import ApprovalRequest, KasEntryOut, PemasukanCreate, PengeluaranCreate
 
 router = APIRouter(prefix="/api/kas", tags=["kas"])
 
@@ -80,9 +81,15 @@ def approve_or_reject_pengeluaran(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("ketua")),
 ):
-    entry = db.query(KasEntry).filter(
-        KasEntry.id == entry_id, KasEntry.komunitas_id == user.komunitas_id, KasEntry.tipe == "pengeluaran"
-    ).first()
+    entry = (
+        db.query(KasEntry)
+        .filter(
+            KasEntry.id == entry_id,
+            KasEntry.komunitas_id == user.komunitas_id,
+            KasEntry.tipe == "pengeluaran",
+        )
+        .first()
+    )
     if not entry:
         raise HTTPException(status_code=404, detail="Entri pengeluaran tidak ditemukan")
     if entry.approval_status != PengeluaranStatus.pending:

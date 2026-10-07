@@ -1,10 +1,11 @@
 """Iuran type CRUD: define recurring/one-time dues categories."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import IuranType, User, PeriodType
+from app.models.models import IuranType, PeriodType, User
 from app.schemas.schemas import IuranTypeCreate, IuranTypeOut
 
 router = APIRouter(prefix="/api/iuran-types", tags=["iuran"])
@@ -43,9 +44,11 @@ def delete_iuran_type(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
-    iuran = db.query(IuranType).filter(
-        IuranType.id == iuran_type_id, IuranType.komunitas_id == user.komunitas_id
-    ).first()
+    iuran = (
+        db.query(IuranType)
+        .filter(IuranType.id == iuran_type_id, IuranType.komunitas_id == user.komunitas_id)
+        .first()
+    )
     if not iuran:
         raise HTTPException(status_code=404, detail="Iuran type tidak ditemukan")
     db.delete(iuran)

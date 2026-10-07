@@ -4,12 +4,12 @@ Creating a Komunitas is intentionally open (no auth) so a new RT/RW can
 self-onboard; it immediately requires an initial admin account to be
 created in the same call, after which all further actions go through auth.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import hash_password
-from app.core.deps import get_current_user
 from app.models.models import Komunitas, User, UserRole
 from app.schemas.schemas import KomunitasCreate, KomunitasOut, UserCreate, UserOut
 
@@ -33,7 +33,11 @@ def create_user(komunitas_id: str, payload: UserCreate, db: Session = Depends(ge
     komunitas = db.query(Komunitas).filter(Komunitas.id == komunitas_id).first()
     if not komunitas:
         raise HTTPException(status_code=404, detail="Komunitas tidak ditemukan")
-    existing = db.query(User).filter(User.komunitas_id == komunitas_id, User.username == payload.username).first()
+    existing = (
+        db.query(User)
+        .filter(User.komunitas_id == komunitas_id, User.username == payload.username)
+        .first()
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Username sudah digunakan di komunitas ini")
     user = User(

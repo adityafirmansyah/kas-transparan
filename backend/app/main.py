@@ -1,10 +1,11 @@
 """FastAPI application entrypoint for kas-transparan."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.routers import auth, komunitas, warga, iuran_types, tagihan, kas, reports, public
+from app.routers import auth, iuran_types, kas, komunitas, public, reports, tagihan, warga
 
 Base.metadata.create_all(bind=engine)
 

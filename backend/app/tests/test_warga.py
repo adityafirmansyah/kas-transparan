@@ -7,9 +7,16 @@ def auth_headers(token):
 
 def test_create_and_list_warga(client, admin_setup):
     token = admin_setup["admin_token"]
-    resp = client.post("/api/warga", json={
-        "nama": "Budi Santoso", "no_hp": "0812345678", "alamat": "Jl. Mawar 1", "no_rumah": "A1"
-    }, headers=auth_headers(token))
+    resp = client.post(
+        "/api/warga",
+        json={
+            "nama": "Budi Santoso",
+            "no_hp": "0812345678",
+            "alamat": "Jl. Mawar 1",
+            "no_rumah": "A1",
+        },
+        headers=auth_headers(token),
+    )
     assert resp.status_code == 201
     warga = resp.json()
     assert warga["nama"] == "Budi Santoso"

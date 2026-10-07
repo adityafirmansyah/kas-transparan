@@ -123,6 +123,21 @@ inactive-warga skipping), payment recording, kas ledger saldo calculation,
 the pengeluaran approval workflow, and the public transparency endpoint
 (including a privacy check that no warga name/description leaks).
 
+### Linting & formatting (backend)
+
+Backend Python code is linted and formatted with [ruff](https://docs.astral.sh/ruff/)
+(config in `backend/pyproject.toml`). Run both before opening a PR:
+
+```bash
+cd backend
+source venv/bin/activate
+ruff check .      # lint (pyflakes, pycodestyle, isort, pyupgrade, bugbear)
+ruff format .     # auto-format
+```
+
+`ruff check .` also runs on every PR via GitHub Actions
+(`.github/workflows/lint.yml`).
+
 ## Getting started with a new komunitas
 
 1. `POST /api/komunitas` with `{ "nama": "RT 05 Sukamaju", "slug": "rt05-sukamaju" }`
