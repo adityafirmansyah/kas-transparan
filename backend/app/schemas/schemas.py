@@ -191,6 +191,20 @@ class UnpaidWargaOut(BaseModel):
     periode: str
 
 
+class TunggakanPeriodeOut(BaseModel):
+    periode: str
+    iuran_nama: str
+    nominal: float
+
+
+class TunggakanMultiOut(BaseModel):
+    warga_id: str
+    warga_nama: str
+    unpaid_periods: list[TunggakanPeriodeOut]
+    total_unpaid_count: int
+    total_nominal: float
+
+
 # ---------- Public transparency ----------
 
 
