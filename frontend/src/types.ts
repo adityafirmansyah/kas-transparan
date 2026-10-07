@@ -6,6 +6,13 @@
 
 export type Role = "admin" | "ketua" | "warga";
 
+export interface Komunitas {
+  id: string;
+  nama: string;
+  slug: string;
+  alamat: string | null;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
