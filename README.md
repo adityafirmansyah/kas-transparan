@@ -15,35 +15,40 @@ without needing a WhatsApp group screenshot or a spreadsheet nobody trusts.
 _(placeholder — add screenshots of the dashboard and public transparency page here
 once the UI is running against real data)_
 
-- `docs/screenshot-dashboard.png`
-- `docs/screenshot-public-page.png`
+- **Screenshots**: `docs/screenshot-dashboard.png`, `docs/screenshot-public-page.png`, `docs/screenshot-self-check.png`
 
 ## Core features (v1 / MVP)
 
 - **Multi-tenant**: one deployment can serve multiple RT/RW/komunitas, each
   fully isolated (own warga list, own kas, own slug for the public page).
-- **Warga management**: add/edit/deactivate residents (nama, no HP, alamat,
-  no rumah).
+- **Warga management**: add, edit, and deactivate residents (nama, no HP / WhatsApp,
+  alamat, no rumah). Accessible by both Admin and Ketua.
 - **Iuran types**: define dues categories (e.g. Iuran Kebersihan, Keamanan,
-  Dana Sosial) with nominal amount and period (monthly or one-time).
-- **Auto-generate tagihan**: one click creates a billing record for every
-  active warga for the current period; safe to re-run (idempotent, skips
-  warga who already have a tagihan for that period).
-- **Payment recording**: admin/bendahara marks a tagihan lunas, with payment
-  method (tunai/transfer) and an optional proof-of-transfer image path —
-  automatically creates a matching pemasukan entry in the ledger.
-- **Buku kas (cash ledger)**: pemasukan (income, auto from payments or manual
-  e.g. donasi) and pengeluaran (expense, manual with category + optional
-  receipt image), with running saldo (balance) calculation.
+  Dana Sosial) with nominal amount and period (monthly or one-time). Managed by Admin.
+- **Auto-generate tagihan**: one-click billing generation for every active warga
+  for any selected period; idempotent (skips warga who already have a bill for that period).
+- **Multi-month & batch payments**:
+  - Checkbox selection in single-period billing view ("Bayar Terpilih").
+  - 1-click batch payment for multi-month arrears ("Tunggakan Multi-Bulan").
+  - Advance / upfront payment recording ("Bayar Dimuka") for residents paying several months ahead, automatically creating bills and marking them paid.
+- **Buku kas (cash ledger)**:
+  - Pemasukan (income, auto-created from tagihan payments or manual like donasi/hibah).
+  - Pengeluaran (expense, with category, date picker, receipt attachment image).
+  - Running saldo (balance) calculation automatically maintained.
 - **Pengeluaran approval workflow**: every expense starts `pending` and must
-  be `approved` (or `rejected`) by a `ketua` (chair) role before it affects
-  the saldo — lightweight accountability without heavy process.
-- **Reports**: monthly summary (total masuk/keluar/saldo) and list of warga
-  who haven't paid for a given period.
-- **Public transparency page** (`/public/:slug`, no login): the core
-  differentiator. Shows aggregate saldo, monthly income/expense totals, and
-  expense breakdown by category — **never** individual warga names or
-  payment status, to protect privacy.
+  be `approved` (or `rejected`) by the `ketua` (chair) role before it counts toward
+  the official saldo.
+- **Warga self-check portal (`/public/:slug/cek-tagihan`)**:
+  - Residents check their own billing & payment history by entering their registered phone / WhatsApp number without any login.
+  - Automatically normalizes phone numbers (supports `+62`, `62`, or `08`).
+  - Itemized history of all dues, payment dates, payment methods, and current arrears balance.
+- **Public transparency page (`/public/:slug`, no login)**:
+  - Shows aggregate saldo, monthly cash inflows/outflows, and expense breakdown by category.
+  - Responsive, compact mobile design with 1-click WhatsApp link sharing.
+  - **Never** exposes individual resident names or arrears lists to protect resident privacy.
+- **Account security**:
+  - Self-service password change for admin and ketua in Settings.
+  - Strict role-based permissions and tenant boundary checks.
 
 ### Explicitly out of scope for v1 (locked decisions)
 
@@ -72,10 +77,11 @@ once the UI is running against real data)_
 When you start the project for the first time with Docker Compose or run the backend locally, the database is automatically seeded with demo data out-of-the-box (`AUTO_SEED=true` when empty):
 
 - **Komunitas Demo**: `RT 05 Sukamaju` (slug: `demo`)
-- **Admin / Bendahara**: `admin` / `admin123` (manage warga, iuran types, generate bills, record payments & ledger entries)
-- **Ketua**: `ketua` / `ketua123` (read access, approve/reject pengeluaran)
+- **Admin / Bendahara**: `admin` / `admin123` (manage dues, record payments & ledger entries)
+- **Ketua**: `ketua` / `ketua123` (approve/reject expenses, update community profile, create pengurus accounts)
 - **Public Transparency Page**: http://localhost:5173/public/demo (no login required)
-- **Preloaded Sample Data**: 3 iuran types (Kebersihan & Keamanan, Dana Sosial, Kas RT) and 4 sample warga households (Blok A1, A2, B1, B2).
+- **Warga Self-Check Portal**: http://localhost:5173/public/demo/cek-tagihan (enter registered resident phone number)
+- **Preloaded Sample Data**: 3 iuran types (Kebersihan & Keamanan, Dana Sosial, Kas RT) and 4 sample warga households.
 
 ### Running or re-running the seeder manually
 
@@ -144,11 +150,13 @@ source venv/bin/activate
 pytest -v
 ```
 
-25 tests cover warga CRUD, tagihan auto-generation (incl. idempotency and
-inactive-warga skipping), payment recording, kas ledger saldo calculation,
+74 automated tests cover warga CRUD, tagihan auto-generation (incl. idempotency and
+inactive-warga skipping), payment recording, advance/future payments,
+multi-month arrears aggregation, kas ledger saldo calculation,
 the pengeluaran approval workflow, the public transparency endpoint
-(including a privacy check that no warga name/description leaks), and the
-idempotent seeder + auto-seed behavior.
+(including a privacy check that no warga name/description leaks),
+the warga self-check portal phone lookup, user authentication (login, /me, change password),
+and role-based permission boundaries.
 
 ### Linting & formatting (backend)
 
@@ -197,17 +205,28 @@ GitHub Actions (`.github/workflows/lint.yml`, `frontend-lint` job).
    `https://yourdomain/public/rt05-sukamaju`.
 2. `POST /api/komunitas/{id}/users` to create an `admin` (bendahara) account
    and a `ketua` account.
-3. Log in via the frontend, add warga, define iuran types, generate tagihan
-   for the current month, and start recording payments/expenses.
+3. Log in as Ketua to configure community settings or add further pengurus accounts.
+4. Log in as Admin to add residents, configure dues categories, generate monthly bills, and record transactions.
 
-## Roles
+## Roles & Permissions Matrix
 
-| Role  | Can do |
-|-------|--------|
-| admin / bendahara | manage warga, iuran types, generate tagihan, record payments, record pemasukan/pengeluaran |
-| ketua | read access to warga/tagihan/kas, approve or reject pengeluaran |
-| warga | (stretch goal, not in v1) view own tagihan status |
-| public (no login) | view the aggregate transparency page at `/public/:slug` |
+| Area / Feature | Action | Admin (Bendahara) | Ketua RT/RW | Warga / Publik |
+|---|---|:---:|:---:|:---:|
+| **Komunitas Profile** | Update nama, slug, alamat | ❌ | ✅ | ❌ |
+| **Pengurus Accounts** | Tambah akun pengurus baru | ❌ | ✅ (Max 1 Ketua) | ❌ |
+| **Data Warga** | Tambah, Edit, Nonaktifkan, Hapus warga | ✅ | ✅ | ❌ |
+| | Lihat daftar warga | ✅ | ✅ | ❌ |
+| **Jenis Iuran** | Tambah & Hapus jenis iuran | ✅ | ❌ | ❌ |
+| | Lihat daftar iuran aktif | ✅ | ✅ (Full-width) | ❌ |
+| **Tagihan & Iuran** | Generate tagihan bulan ini | ✅ | ❌ | ❌ |
+| | Catat bayar lunas (single, batch, dimuka) | ✅ | ❌ | ❌ |
+| | Lihat daftar tagihan & laporan tunggakan | ✅ | ✅ (Read-only) | ❌ |
+| **Buku Kas** | Catat pemasukan & pengeluaran kas | ✅ | ❌ | ❌ |
+| | Approval / reject pengeluaran kas | ❌ | ✅ | ❌ |
+| | Lihat buku kas & saldo | ✅ | ✅ | ❌ |
+| **Self-Service Akun** | Ganti password akun sendiri (`/me`) | ✅ | ✅ | ❌ |
+| **Portal Transparansi** | Cek tagihan mandiri via nomor HP | — | — | ✅ (`/public/:slug/cek-tagihan`) |
+| | Laporan kas publik agregat (tanpa nama) | — | — | ✅ (`/public/:slug`) |
 
 ## Project structure
 
