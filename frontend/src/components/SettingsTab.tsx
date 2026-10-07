@@ -417,7 +417,7 @@ export default function SettingsTab({
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -496,6 +496,72 @@ export default function SettingsTab({
             </tbody>
           </table>
         </div>
+
+        {/* Pengurus Card List (mobile) */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {usersLoading ? (
+            <div className="py-10 text-center text-slate-500">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+              <span>Memuat daftar pengurus...</span>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-sm">
+              Belum ada pengurus terdaftar
+            </div>
+          ) : (
+            users.map((u) => {
+              const isUserAdmin = u.role === "admin";
+              const roleBadgeClass = isUserAdmin
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : u.role === "ketua"
+                  ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                  : "bg-slate-100 text-slate-700 border-slate-200";
+
+              const roleLabel = isUserAdmin
+                ? "Admin / Bendahara"
+                : u.role === "ketua"
+                  ? "Ketua RT / RW"
+                  : "Warga";
+
+              const roleDesc = isUserAdmin
+                ? "Kelola buku kas, iuran, dan pengaturan"
+                : u.role === "ketua"
+                  ? "Persetujuan pencairan dana kas"
+                  : "Akses warga";
+
+              const formattedDate = u.created_at
+                ? new Date(u.created_at).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "–";
+
+              return (
+                <div key={u.id} className="p-4 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700 shrink-0">
+                      {u.username.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-900 text-sm truncate">
+                        {u.username}
+                      </div>
+                      <div className="text-[11px] text-slate-400">{formattedDate}</div>
+                    </div>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold tracking-wide">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${isUserAdmin ? "bg-emerald-500" : "bg-indigo-500"}`}
+                    />
+                    <span className={roleBadgeClass}>{roleLabel}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{roleDesc}</p>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Modal: Tambah Pengurus Baru */}
@@ -506,7 +572,7 @@ export default function SettingsTab({
           aria-labelledby="modal-tambah-pengurus-title"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150"
         >
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
