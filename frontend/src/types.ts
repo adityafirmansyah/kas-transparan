@@ -133,6 +133,7 @@ export interface SaldoResponse {
 
 /** One unpaid period+iuran line item within a multi-month arrears breakdown. */
 export interface TunggakanPeriode {
+  tagihan_id: string;
   periode: string;
   iuran_nama: string;
   nominal: number;
@@ -147,6 +148,18 @@ export interface TunggakanMulti {
   total_unpaid_count: number;
   distinct_months_count: number;
   total_nominal: number;
+}
+
+export interface BatchPayTagihanRequest {
+  tagihan_ids: string[];
+  payment_method: PaymentMethod;
+  proof_image_path?: string;
+}
+
+export interface BatchPayTagihanResponse {
+  paid_count: number;
+  total_nominal: number;
+  paid_tagihan: Tagihan[];
 }
 
 /** Common shape of FastAPI error responses, e.g. { "detail": "..." }. */
