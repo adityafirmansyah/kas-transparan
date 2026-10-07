@@ -6,21 +6,38 @@ import PublicPage from "./pages/PublicPage";
 import { getSession } from "./api";
 import "./App.css";
 
-interface ProtectedRouteProps {
+interface RouteProps {
   children: ReactNode;
 }
 
-function ProtectedRoute({ children }: ProtectedRouteProps): ReactElement {
+function ProtectedRoute({ children }: RouteProps): ReactElement {
   const { token } = getSession();
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function GuestRoute({ children }: RouteProps): ReactElement {
+  const { token } = getSession();
+  return token ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+}
+
+function RootRedirect(): ReactElement {
+  const { token } = getSession();
+  return <Navigate to={token ? "/dashboard" : "/login"} replace />;
 }
 
 function App(): ReactElement {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<RootRedirect />} />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <LoginPage />
+            </GuestRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={
