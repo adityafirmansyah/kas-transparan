@@ -42,8 +42,8 @@ export default function SettingsTab({
   onKomunitasUpdated,
 }: SettingsTabProps): ReactElement {
   const { role: currentRole, komunitasId } = getSession();
-  const isAdmin = currentRole === "admin";
   const canEditProfile = currentRole === "ketua";
+  const canManageUsers = currentRole === "ketua";
 
   // Section 1: Community Profile Form
   const [nama, setNama] = useState(komunitas?.nama ?? "");
@@ -68,6 +68,7 @@ export default function SettingsTab({
   const [users, setUsers] = useState<KomunitasUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
+  const hasKetua = users.some((u) => u.role === "ketua");
 
   // Add User Modal
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -144,7 +145,7 @@ export default function SettingsTab({
 
   async function handleAddUser(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    if (!komunitasId || !isAdmin) return;
+    if (!komunitasId || !canManageUsers) return;
 
     setAddUserError("");
     setUserSaving(true);
@@ -553,7 +554,7 @@ export default function SettingsTab({
             </span>
           </div>
 
-          {isAdmin && (
+          {canManageUsers && (
             <button
               type="button"
               onClick={() => {
@@ -832,9 +833,16 @@ export default function SettingsTab({
                     className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                   >
                     <option value="admin">Admin / Bendahara (Kelola Kas &amp; Iuran)</option>
-                    <option value="ketua">Ketua RT / RW (Persetujuan Pencairan Kas)</option>
+                    <option value="ketua" disabled={hasKetua}>
+                      Ketua RT / RW (Persetujuan Pencairan Kas){hasKetua ? " — sudah ada" : ""}
+                    </option>
                   </select>
                 </div>
+                {hasKetua && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Komunitas ini sudah memiliki 1 akun ketua — hanya 1 ketua yang diperbolehkan
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

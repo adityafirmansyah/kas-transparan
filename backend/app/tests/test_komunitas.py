@@ -207,12 +207,14 @@ def test_list_komunitas_users_cross_tenant_forbidden(client, admin_setup):
     assert resp.status_code == 403
 
 
-def test_create_user_in_komunitas(client, admin_setup):
+def test_create_user_in_komunitas_requires_ketua_after_bootstrap(client, admin_setup):
     komunitas_id = admin_setup["komunitas"]["id"]
+    ketua_token = admin_setup["ketua_token"]
 
     resp = client.post(
         f"/api/komunitas/{komunitas_id}/users",
         json={"username": "bendahara2", "password": "password123", "role": "admin"},
+        headers=auth_header(ketua_token),
     )
     assert resp.status_code == 201
     data = resp.json()
@@ -223,6 +225,89 @@ def test_create_user_in_komunitas(client, admin_setup):
     resp_dup = client.post(
         f"/api/komunitas/{komunitas_id}/users",
         json={"username": "bendahara2", "password": "password123", "role": "admin"},
+        headers=auth_header(ketua_token),
     )
     assert resp_dup.status_code == 400
     assert "Username sudah digunakan" in resp_dup.json()["detail"]
+
+
+def test_create_user_bootstrap_open_when_no_ketua_yet(client):
+    komunitas_resp = client.post(
+        "/api/komunitas",
+        json={"nama": "RW 10 Baru", "slug": "rw10-baru"},
+    )
+    assert komunitas_resp.status_code == 201
+    komunitas_id = komunitas_resp.json()["id"]
+
+    # No auth required for the very first admin account (no ketua yet)
+    resp_admin = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "admin-baru", "password": "password123", "role": "admin"},
+    )
+    assert resp_admin.status_code == 201
+
+    # Still no auth required for the first ketua (bootstrap window still open)
+    resp_ketua = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "ketua-baru", "password": "password123", "role": "ketua"},
+    )
+    assert resp_ketua.status_code == 201
+    assert resp_ketua.json()["role"] == "ketua"
+
+    # Bootstrap window is now closed: unauthenticated create fails
+    resp_closed = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "siapa-saja", "password": "password123", "role": "admin"},
+    )
+    assert resp_closed.status_code == 401
+
+
+def test_create_user_requires_ketua_not_admin(client, admin_setup):
+    komunitas_id = admin_setup["komunitas"]["id"]
+    admin_token = admin_setup["admin_token"]
+
+    resp = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "bendahara3", "password": "password123", "role": "admin"},
+        headers=auth_header(admin_token),
+    )
+    assert resp.status_code == 403
+    assert "Hanya ketua" in resp.json()["detail"]
+
+
+def test_create_user_limits_one_ketua(client, admin_setup):
+    komunitas_id = admin_setup["komunitas"]["id"]
+    ketua_token = admin_setup["ketua_token"]
+
+    resp = client.post(
+        f"/api/komunitas/{komunitas_id}/users",
+        json={"username": "ketua-kedua", "password": "password123", "role": "ketua"},
+        headers=auth_header(ketua_token),
+    )
+    assert resp.status_code == 400
+    assert "Hanya 1 ketua" in resp.json()["detail"]
+
+
+def test_create_user_cross_tenant_ketua_forbidden(client, admin_setup):
+    # Create another tenant with its own ketua
+    other_resp = client.post(
+        "/api/komunitas",
+        json={"nama": "RW 11 Lain", "slug": "rw11-lain"},
+    )
+    other_id = other_resp.json()["id"]
+    client.post(
+        f"/api/komunitas/{other_id}/users",
+        json={"username": "admin-lain", "password": "password123", "role": "admin"},
+    )
+    client.post(
+        f"/api/komunitas/{other_id}/users",
+        json={"username": "ketua-lain", "password": "password123", "role": "ketua"},
+    )
+
+    # Tenant 1's ketua tries to add a user to tenant 2 (other_id)
+    resp = client.post(
+        f"/api/komunitas/{other_id}/users",
+        json={"username": "hijack", "password": "password123", "role": "admin"},
+        headers=auth_header(admin_setup["ketua_token"]),
+    )
+    assert resp.status_code == 403
