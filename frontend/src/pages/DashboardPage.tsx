@@ -11,6 +11,7 @@ import {
   BookOpen,
   Coins,
   CheckCircle2,
+  Settings,
 } from "lucide-react";
 import { clearSession, getSession, api, formatRupiah } from "../api";
 import type { KasEntry, Komunitas, SaldoResponse, TagihanWithWarga, Warga } from "../types";
@@ -18,12 +19,14 @@ import WargaTab from "../components/WargaTab";
 import IuranTab from "../components/IuranTab";
 import TagihanTab from "../components/TagihanTab";
 import KasTab from "../components/KasTab";
+import SettingsTab from "../components/SettingsTab";
 
 const TABS = [
   { id: "Warga", label: "Data Warga", icon: Users },
   { id: "Iuran", label: "Jenis Iuran", icon: Coins },
   { id: "Tagihan", label: "Tagihan Iuran", icon: Receipt },
   { id: "Kas", label: "Buku Kas", icon: BookOpen },
+  { id: "Pengaturan", label: "Pengaturan", icon: Settings },
 ] as const;
 
 type Tab = (typeof TABS)[number]["id"];
@@ -282,6 +285,12 @@ export default function DashboardPage(): ReactElement {
           {tab === "Iuran" && <IuranTab />}
           {tab === "Tagihan" && <TagihanTab />}
           {tab === "Kas" && <KasTab />}
+          {tab === "Pengaturan" && (
+            <SettingsTab
+              komunitas={komunitas}
+              onKomunitasUpdated={(updated) => setKomunitas(updated)}
+            />
+          )}
         </div>
       </main>
     </div>

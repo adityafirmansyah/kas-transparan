@@ -1,6 +1,6 @@
 /**
  * Shared frontend types mirroring backend Pydantic response/request schemas
- * (see backend/app/schemas/schemas.py). Kept intentionally lean for an MVP —
+ * (see backend/app/schemas/schemas.py). Kept intentionally lean for an MVP:
  * only the shapes the frontend actually consumes are modeled here.
  */
 
@@ -11,6 +11,26 @@ export interface Komunitas {
   nama: string;
   slug: string;
   alamat: string | null;
+}
+
+export interface KomunitasUpdate {
+  nama?: string;
+  slug?: string;
+  alamat?: string;
+}
+
+export interface KomunitasUser {
+  id: string;
+  username: string;
+  role: Role;
+  komunitas_id: string;
+  created_at?: string;
+}
+
+export interface UserCreate {
+  username: string;
+  password: string;
+  role: Role;
 }
 
 export interface TokenResponse {
