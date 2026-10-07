@@ -117,6 +117,25 @@ export interface KasEntry {
   created_at: string;
 }
 
+export interface WargaSelfCheckTagihan {
+  id: string;
+  periode: string;
+  iuran_nama: string;
+  nominal: number;
+  status: string;
+  payment_method: string | null;
+  paid_at: string | null;
+}
+
+export interface WargaSelfCheckResponse {
+  warga_nama: string;
+  no_rumah: string | null;
+  komunitas_nama: string;
+  total_unpaid_count: number;
+  total_unpaid_nominal: number;
+  tagihan_list: WargaSelfCheckTagihan[];
+}
+
 export interface PublicSummary {
   komunitas_nama: string;
   saldo_akhir: number;
