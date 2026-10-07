@@ -295,6 +295,14 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(w)}
+                          title="Edit data warga"
+                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
                         {onNavigateToTagihanFuture && w.aktif && (
                           <button
                             type="button"
@@ -306,13 +314,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                             <span>Bayar Dimuka</span>
                           </button>
                         )}
-                        <button
-                          onClick={() => openEditModal(w)}
-                          title="Edit data warga"
-                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
 
                         <button
                           onClick={() => toggleAktif(w)}
@@ -431,6 +432,14 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => openEditModal(w)}
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Edit</span>
+                </button>
                 {onNavigateToTagihanFuture && w.aktif && (
                   <button
                     type="button"
@@ -441,14 +450,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                     <span>Bayar Dimuka</span>
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => openEditModal(w)}
-                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
-                >
-                  <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Edit</span>
-                </button>
                 <button
                   onClick={() => toggleAktif(w)}
                   className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition ${
