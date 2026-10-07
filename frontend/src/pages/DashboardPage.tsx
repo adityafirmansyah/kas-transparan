@@ -162,91 +162,93 @@ export default function DashboardPage(): ReactElement {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
-        {/* 4 Stat Metric Cards */}
-        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* 4 Stat Metric Cards: Compact 2x2 on Mobile, Full 4-Col on Desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {/* Card 1: Saldo Kas Total */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Saldo Kas Total
+          <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-500 mb-1 sm:mb-2">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+                Saldo Kas
               </span>
-              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                <Wallet className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 shrink-0">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-extrabold text-slate-900 font-mono">
+            <div className="text-base sm:text-2xl font-extrabold text-slate-900 font-mono tracking-tight truncate">
               {formatRupiah(saldo)}
             </div>
-            <p className="text-[11px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
+            <p className="hidden sm:flex text-[11px] text-emerald-700 font-medium mt-1 items-center gap-1">
               <CheckCircle2 className="w-3 h-3" />
               <span>Tersedia &amp; terverifikasi</span>
             </p>
           </div>
 
           {/* Card 2: Warga Aktif */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Warga Terdaftar
+          <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-500 mb-1 sm:mb-2">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+                Warga Aktif
               </span>
-              <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
-                <Users className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-100 text-slate-700 shrink-0">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-extrabold text-slate-900 font-mono">
+            <div className="text-base sm:text-2xl font-extrabold text-slate-900 font-mono">
               {wargaCount.aktif}{" "}
-              <span className="text-sm font-normal text-slate-400">/ {wargaCount.total}</span>
+              <span className="text-xs sm:text-sm font-normal text-slate-400">
+                / {wargaCount.total}
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="hidden sm:block text-[11px] text-slate-500 mt-1">
               {wargaCount.aktif} warga aktif menerima tagihan
             </p>
           </div>
 
           {/* Card 3: Status Iuran Bulan Ini */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-500 mb-1 sm:mb-2">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
                 Iuran Bulan Ini
               </span>
-              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                <Receipt className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 shrink-0">
+                <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-extrabold text-slate-900 font-mono">
+            <div className="text-base sm:text-2xl font-extrabold text-slate-900 font-mono">
               {tagihanCount.total > 0
                 ? `${Math.round((tagihanCount.lunas / tagihanCount.total) * 100)}%`
                 : "0%"}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="hidden sm:block text-[11px] text-slate-500 mt-1">
               {tagihanCount.lunas} dari {tagihanCount.total} tagihan telah lunas
             </p>
           </div>
 
           {/* Card 4: Approval Ketua */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-500 mb-1 sm:mb-2">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
                 Approval Ketua
               </span>
               <div
-                className={`p-2 rounded-xl ${
+                className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl shrink-0 ${
                   pendingApprovals > 0
                     ? "bg-amber-50 text-amber-600"
                     : "bg-emerald-50 text-emerald-600"
                 }`}
               >
-                <Clock className="w-4 h-4" />
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div
-              className={`text-2xl font-extrabold font-mono ${
+              className={`text-base sm:text-2xl font-extrabold font-mono ${
                 pendingApprovals > 0 ? "text-amber-600" : "text-emerald-700"
               }`}
             >
               {pendingApprovals}{" "}
-              <span className="text-xs font-normal text-slate-500">Pengeluaran</span>
+              <span className="text-[10px] sm:text-xs font-normal text-slate-500">Item</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="hidden sm:block text-[11px] text-slate-500 mt-1">
               {pendingApprovals > 0
                 ? "Perlu ditinjau oleh Ketua RT"
                 : "Semua pengeluaran telah ditinjau"}
