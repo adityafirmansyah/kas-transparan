@@ -87,6 +87,11 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
     });
   }
 
+  function closeEditModal(): void {
+    setEditingWarga(null);
+    setDeleteConfirmId(null);
+  }
+
   async function handleEdit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     if (!editingWarga) return;
@@ -111,7 +116,10 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
 
   async function toggleAktif(w: Warga): Promise<void> {
     try {
-      await api.put(`/api/warga/${w.id}`, { aktif: !w.aktif });
+      const resp = await api.put<Warga>(`/api/warga/${w.id}`, { aktif: !w.aktif });
+      if (editingWarga && editingWarga.id === w.id) {
+        setEditingWarga(resp.data);
+      }
       load();
     } catch (err) {
       setError(errorMessage(err, "Gagal mengubah status warga"));
@@ -122,6 +130,9 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
     try {
       await api.delete(`/api/warga/${id}`);
       setDeleteConfirmId(null);
+      if (editingWarga && editingWarga.id === id) {
+        setEditingWarga(null);
+      }
       load();
     } catch (err) {
       setError(errorMessage(err, "Gagal menghapus warga"));
@@ -314,43 +325,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                             <span>Bayar Dimuka</span>
                           </button>
                         )}
-
-                        <button
-                          onClick={() => toggleAktif(w)}
-                          title={w.aktif ? "Nonaktifkan warga" : "Aktifkan warga"}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-medium border transition ${
-                            w.aktif
-                              ? "text-slate-700 border-slate-200 hover:bg-slate-100"
-                              : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
-                          }`}
-                        >
-                          {w.aktif ? "Nonaktifkan" : "Aktifkan"}
-                        </button>
-
-                        {deleteConfirmId === w.id ? (
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => confirmDelete(w.id)}
-                              className="text-xs px-2 py-1 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700"
-                            >
-                              Yakin?
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(null)}
-                              className="text-xs px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100"
-                            >
-                              Batal
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirmId(w.id)}
-                            title="Hapus warga"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -448,41 +422,6 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                   >
                     <FastForward className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Bayar Dimuka</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => toggleAktif(w)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition ${
-                    w.aktif
-                      ? "text-slate-700 border-slate-200 hover:bg-slate-100"
-                      : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
-                  }`}
-                >
-                  {w.aktif ? "Nonaktifkan" : "Aktifkan"}
-                </button>
-
-                {deleteConfirmId === w.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => confirmDelete(w.id)}
-                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700"
-                    >
-                      Yakin?
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirmId(null)}
-                      className="min-h-[44px] text-xs px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-100"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirmId(w.id)}
-                    title="Hapus warga"
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition border border-slate-200"
-                  >
-                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -601,7 +540,7 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                 </div>
               </div>
               <button
-                onClick={() => setEditingWarga(null)}
+                onClick={() => closeEditModal()}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
                 <X className="w-4 h-4" />
@@ -662,7 +601,7 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setEditingWarga(null)}
+                  onClick={() => closeEditModal()}
                   className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                 >
                   Batal
@@ -677,6 +616,57 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                 </button>
               </div>
             </form>
+
+            {/* Danger Zone: Status toggle & Delete */}
+            <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Zona Lainnya
+              </p>
+              <button
+                type="button"
+                onClick={() => toggleAktif(editingWarga)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                  editingWarga.aktif
+                    ? "text-slate-700 border-slate-200 hover:bg-slate-50"
+                    : "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                }`}
+              >
+                {editingWarga.aktif ? (
+                  <XCircle className="w-4 h-4" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                <span>{editingWarga.aktif ? "Nonaktifkan Warga" : "Aktifkan Warga"}</span>
+              </button>
+
+              {deleteConfirmId === editingWarga.id ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => confirmDelete(editingWarga.id)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition"
+                  >
+                    Yakin Hapus?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+                  >
+                    Batal
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(editingWarga.id)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-rose-200 text-rose-600 hover:bg-rose-50 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Hapus Warga</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
