@@ -155,7 +155,7 @@ def tunggakan_multi(
 
 @router.get("/export/kas")
 def export_buku_kas(
-    format: str = Query(..., regex="^(csv|xlsx)$"),
+    format: str = Query(..., pattern="^(csv|xlsx)$"),
     periode: str | None = None,  # "YYYY-MM" optional filter
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
@@ -228,7 +228,7 @@ def export_buku_kas(
 
 @router.get("/export/tagihan")
 def export_tagihan_rekap(
-    format: str = Query(..., regex="^(csv|xlsx)$"),
+    format: str = Query(..., pattern="^(csv|xlsx)$"),
     periode: str | None = None,  # "YYYY-MM" optional
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
