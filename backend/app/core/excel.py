@@ -1,4 +1,4 @@
-"""Pure Python XLSX writer generating valid OpenXML/Excel spreadsheets without external libraries."""
+"""Pure Python XLSX writer generating valid OpenXML/Excel spreadsheets."""
 
 import html
 import io
@@ -30,26 +30,31 @@ def build_minimal_xlsx(sheet_name: str, rows: list[list]) -> bytes:
 
     ws_lines.append("</sheetData>")
     ws_lines.append("</worksheet>")
-    ws_xml = "".join(ws_lines).encode("utf-8")
+    ws_xml = "".join(ws_lines).encode()
 
     # 2. [Content_Types].xml
     content_types = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-        '<Default Extension="xml" ContentType="application/xml"/>'
-        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-        "</Types>"
-    ).encode("utf-8")
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        b'<Default Extension="rels" '
+        b'ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        b'<Default Extension="xml" ContentType="application/xml"/>'
+        b'<Override PartName="/xl/workbook.xml" '
+        b'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        b'<Override PartName="/xl/worksheets/sheet1.xml" '
+        b'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        b"</Types>"
+    )
 
     # 3. _rels/.rels
     root_rels = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
-        "</Relationships>"
-    ).encode("utf-8")
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        b'<Relationship Id="rId1" '
+        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        b'Target="xl/workbook.xml"/>'
+        b"</Relationships>"
+    )
 
     # 4. xl/workbook.xml
     safe_sheet_name = html.escape(sheet_name[:31])
@@ -61,15 +66,17 @@ def build_minimal_xlsx(sheet_name: str, rows: list[list]) -> bytes:
         f'<sheet name="{safe_sheet_name}" sheetId="1" r:id="rId1"/>'
         "</sheets>"
         "</workbook>"
-    ).encode("utf-8")
+    ).encode()
 
     # 5. xl/_rels/workbook.xml.rels
     wb_rels = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-        "</Relationships>"
-    ).encode("utf-8")
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        b'<Relationship Id="rId1" '
+        b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        b'Target="worksheets/sheet1.xml"/>'
+        b"</Relationships>"
+    )
 
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
