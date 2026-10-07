@@ -115,9 +115,7 @@ def list_kas_entries(
     return filter_kas_entries_by_pic(db, entries, user)
 
 
-def filter_kas_entries_by_pic(
-    db: Session, entries: list[KasEntry], user: User
-) -> list[KasEntry]:
+def filter_kas_entries_by_pic(db: Session, entries: list[KasEntry], user: User) -> list[KasEntry]:
     """Scopes kas entries to the current admin's PIC ownership.
 
     - Entries auto-generated from a tagihan payment are scoped by the

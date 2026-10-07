@@ -163,9 +163,7 @@ def test_kas_entries_scoped_by_pic_for_admin(client, admin_setup):
     )
 
     # Admin1 creates own Iuran Kas and generates + pays a tagihan -> auto kas entry
-    client.post(
-        "/api/warga", json={"nama": "Pak Warga Kas"}, headers=auth_headers(admin1_token)
-    )
+    client.post("/api/warga", json={"nama": "Pak Warga Kas"}, headers=auth_headers(admin1_token))
 
     iuran_resp = client.post(
         "/api/iuran-types",
