@@ -173,7 +173,7 @@ export default function KasTab(): ReactElement {
           </div>
           <div>
             <span className="text-xs uppercase tracking-wider text-emerald-300 font-semibold block">
-              Saldo Kas Riil Saat Ini
+              {isAdmin ? "Saldo Kas yang Anda Kelola" : "Saldo Kas Riil Saat Ini"}
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-0.5">
               {formatRupiah(saldo)}
@@ -449,7 +449,9 @@ export default function KasTab(): ReactElement {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-xs text-slate-500 pr-1 hidden sm:block">Buku Kas Umum</div>
+            <div className="text-xs text-slate-500 pr-1 hidden sm:block">
+              {isAdmin ? "Entri yang Anda kelola" : "Buku Kas Umum (semua PIC)"}
+            </div>
             {isAdmin && (
               <div className="flex items-center gap-1.5">
                 <button
