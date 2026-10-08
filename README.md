@@ -250,6 +250,8 @@ This is an open-source project and contributions are welcome.
 4. Be kind — this tool is meant to help volunteer treasurers who are
    usually doing this on top of a full-time job.
 
+If you find this project helpful for your neighborhood or community, consider [sponsoring the maintainer](https://github.com/sponsors/adityafirmansyah) to support ongoing hosting and development.
+
 Ideas for future phases (not yet built): WhatsApp reminder bot, QRIS/payment
 gateway integration, warga self-service portal, OCR for payment proof
 verification.
