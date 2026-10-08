@@ -84,12 +84,17 @@ export interface IuranType {
   aktif: boolean;
   admin_id?: string | null;
   admin_username?: string | null;
+  target_warga_ids: string[];
 }
 
 export interface IuranTypeCreate {
   nama: string;
   nominal: number;
   period_type: PeriodType;
+}
+
+export interface IuranTypeTargetWargaRequest {
+  warga_ids: string[];
 }
 
 export type PaymentMethod = "tunai" | "transfer";

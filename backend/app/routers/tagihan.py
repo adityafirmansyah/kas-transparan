@@ -61,6 +61,13 @@ def generate_tagihan(
         db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id, Warga.aktif.is_(True)).all()
     )
 
+    # If this iuran type has explicitly targeted warga, restrict generation
+    # to only those (still filtered to active); otherwise default to ALL
+    # active warga in the komunitas.
+    if iuran_type.target_warga:
+        target_ids = {w.id for w in iuran_type.target_warga}
+        active_warga = [w for w in active_warga if w.id in target_ids]
+
     existing_warga_ids = {
         t.warga_id
         for t in db.query(Tagihan)

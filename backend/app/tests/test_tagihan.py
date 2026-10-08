@@ -35,6 +35,70 @@ def test_generate_tagihan_creates_one_per_active_warga(client, admin_setup):
     assert all(t["status"] == "belum_bayar" for t in created)
 
 
+def test_set_target_warga_restricts_tagihan_generation(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=4)
+
+    # Target only 2 of the 4 warga
+    targeted_ids = warga_ids[:2]
+    resp_target = client.put(
+        f"/api/iuran-types/{iuran['id']}/target-warga",
+        json={"warga_ids": targeted_ids},
+        headers=auth_headers(token),
+    )
+    assert resp_target.status_code == 200
+    assert set(resp_target.json()["target_warga_ids"]) == set(targeted_ids)
+
+    resp = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2025-02"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 201
+    created = resp.json()
+    assert len(created) == 2
+    assert {t["warga_id"] for t in created} == set(targeted_ids)
+
+
+def test_empty_target_warga_falls_back_to_all_active(client, admin_setup):
+    token = admin_setup["admin_token"]
+    warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=3)
+
+    # Explicitly set, then clear back to empty (default = all)
+    client.put(
+        f"/api/iuran-types/{iuran['id']}/target-warga",
+        json={"warga_ids": [warga_ids[0]]},
+        headers=auth_headers(token),
+    )
+    resp_clear = client.put(
+        f"/api/iuran-types/{iuran['id']}/target-warga",
+        json={"warga_ids": []},
+        headers=auth_headers(token),
+    )
+    assert resp_clear.status_code == 200
+    assert resp_clear.json()["target_warga_ids"] == []
+
+    resp = client.post(
+        "/api/tagihan/generate",
+        json={"iuran_type_id": iuran["id"], "periode": "2025-03"},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 201
+    assert len(resp.json()) == 3
+
+
+def test_set_target_warga_rejects_unknown_warga_id(client, admin_setup):
+    token = admin_setup["admin_token"]
+    _, iuran = _setup_warga_and_iuran(client, token, n_warga=2)
+
+    resp = client.put(
+        f"/api/iuran-types/{iuran['id']}/target-warga",
+        json={"warga_ids": ["nonexistent-id"]},
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 400
+
+
 def test_generate_tagihan_is_idempotent(client, admin_setup):
     token = admin_setup["admin_token"]
     warga_ids, iuran = _setup_warga_and_iuran(client, token, n_warga=2)

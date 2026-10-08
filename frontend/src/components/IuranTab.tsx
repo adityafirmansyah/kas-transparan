@@ -12,9 +12,10 @@ import {
   Clock,
   User,
   ArrowRightLeft,
+  Users,
 } from "lucide-react";
 import { api, errorMessage, formatRupiah, getSession } from "../api";
-import type { IuranType, KomunitasUser, PeriodType } from "../types";
+import type { IuranType, KomunitasUser, PeriodType, Warga } from "../types";
 
 interface IuranFormState {
   nama: string;
@@ -42,6 +43,46 @@ export default function IuranTab(): ReactElement {
   const [targetAdminId, setTargetAdminId] = useState("");
   const [reassigningLoading, setReassigningLoading] = useState(false);
 
+  // Target warga modal state (admin only)
+  const [wargaList, setWargaList] = useState<Warga[]>([]);
+  const [targetingIuran, setTargetingIuran] = useState<IuranType | null>(null);
+  const [selectedWargaIds, setSelectedWargaIds] = useState<string[]>([]);
+  const [targetSaving, setTargetSaving] = useState(false);
+
+  function openTargetModal(iuran: IuranType): void {
+    setTargetingIuran(iuran);
+    setSelectedWargaIds(iuran.target_warga_ids);
+  }
+
+  function toggleWargaSelection(wargaId: string): void {
+    setSelectedWargaIds((prev) =>
+      prev.includes(wargaId) ? prev.filter((id) => id !== wargaId) : [...prev, wargaId]
+    );
+  }
+
+  async function handleSaveTargetWarga(): Promise<void> {
+    if (!targetingIuran) return;
+    setTargetSaving(true);
+    setError("");
+    try {
+      await api.put(`/api/iuran-types/${targetingIuran.id}/target-warga`, {
+        warga_ids: selectedWargaIds,
+      });
+      setSuccess(
+        selectedWargaIds.length === 0
+          ? `${targetingIuran.nama} kini berlaku untuk semua warga aktif`
+          : `${targetingIuran.nama} kini hanya berlaku untuk ${selectedWargaIds.length} warga terpilih`
+      );
+      setTargetingIuran(null);
+      load();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err) {
+      setError(errorMessage(err, "Gagal menyimpan target warga"));
+    } finally {
+      setTargetSaving(false);
+    }
+  }
+
   function load(): void {
     setLoading(true);
     api
@@ -65,6 +106,15 @@ export default function IuranTab(): ReactElement {
         .catch(() => {});
     }
   }, [isKetua, komunitasId]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      api
+        .get<Warga[]>("/api/warga")
+        .then((r) => setWargaList(r.data))
+        .catch(() => {});
+    }
+  }, [isAdmin]);
 
   async function handleReassign(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -294,6 +344,21 @@ export default function IuranTab(): ReactElement {
                             </span>
                           </>
                         )}
+                        <span className="text-slate-300">&bull;</span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium ${
+                            i.target_warga_ids.length === 0
+                              ? "text-slate-500 bg-slate-100"
+                              : "text-amber-700 bg-amber-50 border border-amber-200"
+                          }`}
+                        >
+                          <Users className="w-3 h-3" />
+                          <span>
+                            {i.target_warga_ids.length === 0
+                              ? "Semua Warga"
+                              : `${i.target_warga_ids.length} Warga Terpilih`}
+                          </span>
+                        </span>
                       </div>
                     </div>
 
@@ -306,6 +371,18 @@ export default function IuranTab(): ReactElement {
                           {formatRupiah(i.nominal)}
                         </span>
                       </div>
+
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => openTargetModal(i)}
+                          title="Kelola warga target untuk iuran ini"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition"
+                        >
+                          <Users className="w-3 h-3 text-slate-500" />
+                          <span>Kelola Warga Target</span>
+                        </button>
+                      )}
 
                       {isKetua && (
                         <button
@@ -414,6 +491,95 @@ export default function IuranTab(): ReactElement {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kelola Warga Target (Admin only) */}
+      {targetingIuran && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-700" />
+                <h4 className="font-bold text-slate-900 text-sm">Kelola Warga Target</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTargetingIuran(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Pilih warga yang wajib membayar <strong>{targetingIuran.nama}</strong>. Jika tidak ada
+              yang dipilih, iuran ini berlaku untuk <strong>semua warga aktif</strong> (perilaku
+              default).
+            </p>
+
+            <div className="flex items-center justify-between text-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedWargaIds(wargaList.map((w) => w.id))}
+                className="text-emerald-700 font-semibold hover:underline"
+              >
+                Pilih Semua
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedWargaIds([])}
+                className="text-slate-500 font-semibold hover:underline"
+              >
+                Kosongkan (= Semua Warga)
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+              {wargaList.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">Belum ada data warga</div>
+              ) : (
+                wargaList.map((w) => (
+                  <label
+                    key={w.id}
+                    className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedWargaIds.includes(w.id)}
+                      onChange={() => toggleWargaSelection(w.id)}
+                      className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                    />
+                    <span className="flex-1 text-slate-800">{w.nama}</span>
+                    {!w.aktif && (
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                        Nonaktif
+                      </span>
+                    )}
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setTargetingIuran(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTargetWarga}
+                disabled={targetSaving}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition disabled:opacity-50"
+              >
+                {targetSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Simpan Target</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

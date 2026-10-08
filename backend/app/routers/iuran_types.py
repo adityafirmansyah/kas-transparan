@@ -5,8 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models.models import IuranType, PeriodType, User
-from app.schemas.schemas import IuranTypeCreate, IuranTypeOut, IuranTypeReassignRequest
+from app.models.models import IuranType, PeriodType, User, Warga
+from app.schemas.schemas import (
+    IuranTypeCreate,
+    IuranTypeOut,
+    IuranTypeReassignRequest,
+    IuranTypeTargetWargaRequest,
+)
 
 router = APIRouter(prefix="/api/iuran-types", tags=["iuran"])
 
@@ -20,6 +25,7 @@ def _iuran_out(iuran: IuranType) -> IuranTypeOut:
         aktif=iuran.aktif,
         admin_id=iuran.admin_id,
         admin_username=iuran.admin_user.username if iuran.admin_user else None,
+        target_warga_ids=[w.id for w in iuran.target_warga],
     )
 
 
@@ -110,6 +116,53 @@ def reassign_iuran_type(
         raise HTTPException(status_code=404, detail="Admin tujuan tidak ditemukan di komunitas ini")
 
     iuran.admin_id = target_admin.id
+    db.commit()
+    db.refresh(iuran)
+    return _iuran_out(iuran)
+
+
+@router.put("/{iuran_type_id}/target-warga", response_model=IuranTypeOut)
+def set_target_warga(
+    iuran_type_id: str,
+    payload: IuranTypeTargetWargaRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """Sets the specific warga targeted by this iuran type.
+
+    An empty list (default) means the iuran applies to ALL active warga —
+    this is the fallback behavior used by tagihan generation.
+    """
+    iuran = (
+        db.query(IuranType)
+        .filter(IuranType.id == iuran_type_id, IuranType.komunitas_id == user.komunitas_id)
+        .first()
+    )
+    if not iuran:
+        raise HTTPException(status_code=404, detail="Iuran type tidak ditemukan")
+    if iuran.admin_id and iuran.admin_id != user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Hanya admin penanggung jawab yang dapat mengatur target warga iuran ini",
+        )
+
+    if payload.warga_ids:
+        warga_list = (
+            db.query(Warga)
+            .filter(Warga.id.in_(payload.warga_ids), Warga.komunitas_id == user.komunitas_id)
+            .all()
+        )
+        found_ids = {w.id for w in warga_list}
+        missing = set(payload.warga_ids) - found_ids
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Warga tidak ditemukan di komunitas ini: {', '.join(missing)}",
+            )
+        iuran.target_warga = warga_list
+    else:
+        iuran.target_warga = []
+
     db.commit()
     db.refresh(iuran)
     return _iuran_out(iuran)
