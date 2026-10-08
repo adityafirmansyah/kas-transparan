@@ -16,6 +16,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     String,
+    Table,
     UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
@@ -26,6 +27,14 @@ from app.core.database import Base
 
 def gen_uuid() -> str:
     return str(uuid.uuid4())
+
+
+iuran_type_warga = Table(
+    "iuran_type_warga",
+    Base.metadata,
+    Column("iuran_type_id", String, ForeignKey("iuran_types.id"), primary_key=True),
+    Column("warga_id", String, ForeignKey("warga.id"), primary_key=True),
+)
 
 
 class UserRole(enum.StrEnum):
@@ -110,6 +119,9 @@ class Warga(Base):
 
     komunitas = relationship("Komunitas", back_populates="warga")
     tagihan = relationship("Tagihan", back_populates="warga", cascade="all, delete-orphan")
+    targeted_by_iuran_types = relationship(
+        "IuranType", secondary=iuran_type_warga, back_populates="target_warga"
+    )
 
 
 class IuranType(Base):
@@ -129,6 +141,9 @@ class IuranType(Base):
     komunitas = relationship("Komunitas", back_populates="iuran_types")
     admin_user = relationship("User", foreign_keys=[admin_id])
     tagihan = relationship("Tagihan", back_populates="iuran_type", cascade="all, delete-orphan")
+    target_warga = relationship(
+        "Warga", secondary=iuran_type_warga, back_populates="targeted_by_iuran_types"
+    )
 
 
 class Tagihan(Base):

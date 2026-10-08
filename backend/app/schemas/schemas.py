@@ -124,10 +124,15 @@ class IuranTypeOut(BaseModel):
     aktif: bool
     admin_id: str | None = None
     admin_username: str | None = None
+    target_warga_ids: list[str] = []
 
 
 class IuranTypeReassignRequest(BaseModel):
     admin_id: str
+
+
+class IuranTypeTargetWargaRequest(BaseModel):
+    warga_ids: list[str]
 
 
 # ---------- Tagihan ----------
