@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     AUTO_SEED: bool = True
+    PUBLIC_PORTAL_SLUG: str = ""
 
 
 settings = Settings()

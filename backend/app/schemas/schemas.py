@@ -306,3 +306,8 @@ class PublicLedgerEntry(BaseModel):
     tanggal: date
     # deskripsi/warga identity intentionally omitted for privacy on pengeluaran->ok to show desc
     deskripsi: str | None = None
+
+
+class DefaultKomunitasOut(BaseModel):
+    slug: str
+    nama: str
