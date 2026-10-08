@@ -86,6 +86,7 @@ def create_user(
     new_user = User(
         komunitas_id=komunitas_id,
         username=payload.username,
+        nama=payload.nama.strip(),
         hashed_password=hash_password(payload.password),
         role=new_role,
     )

@@ -11,6 +11,7 @@ def test_login_success(client, admin_setup):
     data = resp.json()
     assert data["role"] == "admin"
     assert "access_token" in data
+    assert data["nama"] == "Admin Satu"
 
 
 def test_login_wrong_password(client, admin_setup):
@@ -25,6 +26,29 @@ def test_get_me(client, admin_setup):
     data = resp.json()
     assert data["username"] == "admin1"
     assert data["role"] == "admin"
+    assert data["nama"] == "Admin Satu"
+
+
+def test_update_me_nama_success(client, admin_setup):
+    token = admin_setup["admin_token"]
+    resp = client.put("/api/auth/me", json={"nama": "Nama Baru Admin"}, headers=auth_headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["nama"] == "Nama Baru Admin"
+
+    # Confirm persisted
+    me = client.get("/api/auth/me", headers=auth_headers(token))
+    assert me.json()["nama"] == "Nama Baru Admin"
+
+
+def test_update_me_nama_rejects_empty(client, admin_setup):
+    token = admin_setup["admin_token"]
+    resp = client.put("/api/auth/me", json={"nama": "   "}, headers=auth_headers(token))
+    assert resp.status_code == 400
+
+
+def test_update_me_nama_requires_auth(client):
+    resp = client.put("/api/auth/me", json={"nama": "Tanpa Login"})
+    assert resp.status_code == 401
 
 
 def test_change_password_success_and_relogin(client, admin_setup):

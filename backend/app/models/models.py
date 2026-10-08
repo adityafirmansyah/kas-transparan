@@ -82,6 +82,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
     username = Column(String, nullable=False)
+    nama = Column(String, nullable=True)  # display name, e.g. "Budi Santoso"
     hashed_password = Column(String, nullable=False)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.admin)
     created_at = Column(DateTime, default=datetime.utcnow)

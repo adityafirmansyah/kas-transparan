@@ -13,6 +13,7 @@ from app.schemas.schemas import (
     LoginRequest,
     TokenResponse,
     UserOut,
+    UserUpdate,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -35,11 +36,27 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         komunitas_id=user.komunitas_id,
         user_id=user.id,
         username=user.username,
+        nama=user.nama,
     )
 
 
 @router.get("/me", response_model=UserOut)
 def get_me(user: User = Depends(get_current_user)):
+    return user
+
+
+@router.put("/me", response_model=UserOut)
+def update_me(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    nama = payload.nama.strip()
+    if not nama:
+        raise HTTPException(status_code=400, detail="Nama tidak boleh kosong")
+    user.nama = nama
+    db.commit()
+    db.refresh(user)
     return user
 
 

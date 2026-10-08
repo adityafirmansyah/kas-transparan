@@ -20,18 +20,25 @@ class TokenResponse(BaseModel):
     komunitas_id: str
     user_id: str | None = None
     username: str | None = None
+    nama: str | None = None
 
 
 class UserCreate(BaseModel):
     username: str
     password: str
+    nama: str
     role: Literal["admin", "ketua", "warga"] = "admin"
+
+
+class UserUpdate(BaseModel):
+    nama: str
 
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
     username: str
+    nama: str | None = None
     role: str
     komunitas_id: str
     created_at: datetime | None = None

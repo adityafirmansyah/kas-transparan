@@ -19,12 +19,15 @@ export function setSession({
   komunitas_id,
   user_id,
   username,
+  nama,
 }: TokenResponse): void {
   localStorage.setItem("kas_token", access_token);
   localStorage.setItem("kas_role", role);
   localStorage.setItem("kas_komunitas_id", komunitas_id);
   if (user_id) localStorage.setItem("kas_user_id", user_id);
   if (username) localStorage.setItem("kas_username", username);
+  if (nama) localStorage.setItem("kas_nama", nama);
+  else localStorage.removeItem("kas_nama");
 }
 
 export function clearSession(): void {
@@ -33,6 +36,7 @@ export function clearSession(): void {
   localStorage.removeItem("kas_komunitas_id");
   localStorage.removeItem("kas_user_id");
   localStorage.removeItem("kas_username");
+  localStorage.removeItem("kas_nama");
 }
 
 export interface Session {
@@ -41,6 +45,7 @@ export interface Session {
   komunitasId: string | null;
   userId: string | null;
   username: string | null;
+  nama: string | null;
 }
 
 export function getSession(): Session {
@@ -50,7 +55,13 @@ export function getSession(): Session {
     komunitasId: localStorage.getItem("kas_komunitas_id"),
     userId: localStorage.getItem("kas_user_id"),
     username: localStorage.getItem("kas_username"),
+    nama: localStorage.getItem("kas_nama"),
   };
+}
+
+/** Updates just the cached display name (nama) without a full re-login. */
+export function updateSessionNama(nama: string): void {
+  localStorage.setItem("kas_nama", nama);
 }
 
 export function formatRupiah(amount: number | null | undefined): string {

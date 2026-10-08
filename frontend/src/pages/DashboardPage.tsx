@@ -33,7 +33,7 @@ type Tab = (typeof TABS)[number]["id"];
 
 export default function DashboardPage(): ReactElement {
   const navigate = useNavigate();
-  const { role, komunitasId } = getSession();
+  const { role, komunitasId, nama } = getSession();
   const [tab, setTab] = useState<Tab>("Warga");
   const [futureWargaId, setFutureWargaId] = useState<string | undefined>(undefined);
 
@@ -146,11 +146,13 @@ export default function DashboardPage(): ReactElement {
 
             <div className="flex items-center gap-1.5 sm:gap-2 sm:pl-2 sm:border-l sm:border-slate-200">
               <span
-                title={`Peran: ${role || "Pengurus"}`}
+                title={`${nama || "Pengurus"} (${role || "Pengurus"})`}
                 className={`inline-flex items-center justify-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1.5 sm:py-1 min-h-[44px] sm:min-h-0 rounded-lg border capitalize ${roleBadgeStyle}`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 sm:hidden" />
-                <span className="hidden sm:inline">Peran: {role || "Pengurus"}</span>
+                <span className="hidden sm:inline">
+                  {nama || "Pengurus"} ({role || "Pengurus"})
+                </span>
               </span>
 
               <button
