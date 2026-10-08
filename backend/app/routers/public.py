@@ -16,9 +16,29 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.models import KasEntry, Komunitas, PengeluaranStatus, Tagihan, TagihanStatus, Warga
-from app.schemas.schemas import PublicSummary, WargaSelfCheckResponse, WargaSelfCheckTagihan
+from app.schemas.schemas import (
+    DefaultKomunitasOut,
+    PublicSummary,
+    WargaSelfCheckResponse,
+    WargaSelfCheckTagihan,
+)
 
 router = APIRouter(prefix="/api/public", tags=["public"])
+
+
+@router.get("/default-komunitas", response_model=DefaultKomunitasOut)
+def get_default_komunitas(db: Session = Depends(get_db)):
+    """Returns the slug/nama of the earliest-created komunitas in this deployment.
+
+    Used by the Login page to show a working public-portal link without
+    requiring authentication. Safe to expose: slug/nama carry no sensitive
+    financial or resident data, and this deployment currently serves a
+    single komunitas per VPS/instance.
+    """
+    komunitas = db.query(Komunitas).order_by(Komunitas.created_at.asc()).first()
+    if not komunitas:
+        raise HTTPException(status_code=404, detail="Belum ada komunitas terdaftar")
+    return DefaultKomunitasOut(slug=komunitas.slug, nama=komunitas.nama)
 
 
 @router.get("/{slug}/summary", response_model=PublicSummary)

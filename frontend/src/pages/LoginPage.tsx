@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useState, type FormEvent, type ReactElement } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShieldCheck, User, Lock, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { api, errorMessage, setSession } from "../api";
@@ -9,7 +9,15 @@ export default function LoginPage(): ReactElement {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api
+      .get<{ slug: string; nama: string }>("/api/public/default-komunitas")
+      .then((r) => setPublicSlug(r.data.slug))
+      .catch(() => setPublicSlug(null));
+  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -133,23 +141,25 @@ export default function LoginPage(): ReactElement {
           </form>
 
           {/* Public Access Civic Banner */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3.5 text-center">
-              <p className="text-xs font-semibold text-slate-800">Warga RT/RW Ingin Cek Kas?</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Laporan kas terbuka untuk publik tanpa login:
-              </p>
-              <div className="mt-2 flex items-center justify-center">
-                <Link
-                  to="/public/rt01-sukamaju"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"
-                >
-                  <span>Buka portal: /public/rt01-sukamaju</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
+          {publicSlug && (
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3.5 text-center">
+                <p className="text-xs font-semibold text-slate-800">Warga RT/RW Ingin Cek Kas?</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Laporan kas terbuka untuk publik tanpa login:
+                </p>
+                <div className="mt-2 flex items-center justify-center">
+                  <Link
+                    to={`/public/${publicSlug}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"
+                  >
+                    <span>Buka portal: /public/{publicSlug}</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-400">

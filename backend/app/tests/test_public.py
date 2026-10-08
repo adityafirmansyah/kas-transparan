@@ -13,6 +13,19 @@ def test_public_summary_requires_no_auth(client, admin_setup):
     assert resp.status_code == 200
 
 
+def test_public_default_komunitas_requires_no_auth(client, admin_setup):
+    resp = client.get("/api/public/default-komunitas")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["slug"] == admin_setup["komunitas"]["slug"]
+    assert data["nama"] == admin_setup["komunitas"]["nama"]
+
+
+def test_public_default_komunitas_404_when_none_exist(client):
+    resp = client.get("/api/public/default-komunitas")
+    assert resp.status_code == 404
+
+
 def test_public_summary_unknown_slug_404(client):
     resp = client.get("/api/public/tidak-ada/summary")
     assert resp.status_code == 404
