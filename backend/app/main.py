@@ -51,6 +51,17 @@ def _ensure_sqlite_migrations():
                         {"aid": first_admin[0], "iid": iuran_id},
                     )
                     conn.commit()
+
+            # Check existing columns in users
+            result_users = conn.execute(text("PRAGMA table_info(users)"))
+            user_columns = [row[1] for row in result_users.fetchall()]
+            if "nama" not in user_columns:
+                logger.info("Migrating users: adding nama column...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN nama VARCHAR"))
+                conn.commit()
+                # Backfill existing users: default nama = username (title-cased)
+                conn.execute(text("UPDATE users SET nama = username WHERE nama IS NULL"))
+                conn.commit()
     except Exception as exc:
         logger.warning("Migration hook note: %s", exc)
 

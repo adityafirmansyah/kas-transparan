@@ -37,11 +37,13 @@ DEMO_USERS = [
     {
         "username": "admin",
         "password": "admin123",
+        "nama": "Budi Santoso",
         "role": UserRole.admin,
     },
     {
         "username": "ketua",
         "password": "ketua123",
+        "nama": "Siti Rahayu",
         "role": UserRole.ketua,
     },
 ]
@@ -152,6 +154,7 @@ def seed_data(db: Session | None = None) -> dict[str, Any]:
                 new_user = User(
                     komunitas_id=komunitas.id,
                     username=user_data["username"],
+                    nama=user_data.get("nama"),
                     hashed_password=hash_password(user_data["password"]),
                     role=user_data["role"],
                 )

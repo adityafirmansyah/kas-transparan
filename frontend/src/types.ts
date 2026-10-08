@@ -22,6 +22,7 @@ export interface KomunitasUpdate {
 export interface KomunitasUser {
   id: string;
   username: string;
+  nama?: string;
   role: Role;
   komunitas_id: string;
   created_at?: string;
@@ -29,8 +30,13 @@ export interface KomunitasUser {
 
 export interface UserCreate {
   username: string;
+  nama: string;
   password: string;
   role: Role;
+}
+
+export interface UserUpdate {
+  nama: string;
 }
 
 export interface TokenResponse {
@@ -40,6 +46,7 @@ export interface TokenResponse {
   komunitas_id: string;
   user_id?: string;
   username?: string;
+  nama?: string;
 }
 
 export interface Warga {

@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Users,
   UserPlus,
+  UserCircle,
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
@@ -17,7 +18,7 @@ import {
   KeyRound,
   Info,
 } from "lucide-react";
-import { api, errorMessage, getSession } from "../api";
+import { api, errorMessage, getSession, updateSessionNama } from "../api";
 import type { Komunitas, KomunitasUpdate, KomunitasUser, Role, UserCreate } from "../types";
 
 interface SettingsTabProps {
@@ -27,12 +28,14 @@ interface SettingsTabProps {
 
 interface AddUserFormState {
   username: string;
+  nama: string;
   password: string;
   role: Role;
 }
 
 const EMPTY_USER_FORM: AddUserFormState = {
   username: "",
+  nama: "",
   password: "",
   role: "admin",
 };
@@ -84,6 +87,12 @@ export default function SettingsTab({
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  // Section 2b: Update Own Display Name (available to admin and ketua)
+  const [namaSaya, setNamaSaya] = useState(getSession().nama || "");
+  const [namaSaving, setNamaSaving] = useState(false);
+  const [namaError, setNamaError] = useState("");
+  const [namaSuccess, setNamaSuccess] = useState("");
 
   const loadUsers = useCallback((): void => {
     if (!komunitasId) return;
@@ -147,12 +156,19 @@ export default function SettingsTab({
     e.preventDefault();
     if (!komunitasId || !canManageUsers) return;
 
+    const trimmedNama = userForm.nama.trim();
+    if (!trimmedNama) {
+      setAddUserError("Nama pengurus wajib diisi");
+      return;
+    }
+
     setAddUserError("");
     setUserSaving(true);
 
     try {
       const payload: UserCreate = {
         username: userForm.username.trim(),
+        nama: trimmedNama,
         password: userForm.password,
         role: userForm.role,
       };
@@ -177,6 +193,30 @@ export default function SettingsTab({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  }
+
+  async function handleUpdateNama(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    setNamaError("");
+    setNamaSuccess("");
+
+    const trimmed = namaSaya.trim();
+    if (!trimmed) {
+      setNamaError("Nama tidak boleh kosong");
+      return;
+    }
+
+    setNamaSaving(true);
+    try {
+      await api.put("/api/auth/me", { nama: trimmed });
+      updateSessionNama(trimmed);
+      setNamaSuccess("Nama berhasil diperbarui");
+      setTimeout(() => setNamaSuccess(""), 4000);
+    } catch (err) {
+      setNamaError(errorMessage(err, "Gagal memperbarui nama"));
+    } finally {
+      setNamaSaving(false);
+    }
   }
 
   async function handleChangePassword(e: FormEvent<HTMLFormElement>): Promise<void> {
@@ -425,6 +465,61 @@ export default function SettingsTab({
         </div>
       </div>
 
+      {/* Section: Ubah Nama Akun Sendiri */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <UserCircle className="w-5 h-5 text-emerald-700" />
+          <h3 className="text-sm font-bold text-slate-900">Ubah Nama Akun Saya</h3>
+        </div>
+        <p className="text-xs text-slate-500 -mt-2">
+          Nama ini akan ditampilkan di dashboard sebagai identitas Anda (admin atau ketua)
+        </p>
+
+        {namaSuccess && (
+          <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-medium">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{namaSuccess}</span>
+          </div>
+        )}
+        {namaError && (
+          <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-medium">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <span className="flex-1">{namaError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleUpdateNama} className="flex flex-col sm:flex-row gap-3 max-w-md">
+          <div className="relative flex-1">
+            <UserCircle className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+            <input
+              type="text"
+              required
+              value={namaSaya}
+              onChange={(e) => setNamaSaya(e.target.value)}
+              placeholder="Nama lengkap Anda"
+              className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={namaSaving}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition disabled:opacity-50 shrink-0"
+          >
+            {namaSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Simpan Nama</span>
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+
       {/* Section: Ganti Password Akun Sendiri */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -634,9 +729,14 @@ export default function SettingsTab({
                       <td className="py-3.5 px-6 font-semibold text-slate-900">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-                            {u.username.substring(0, 2).toUpperCase()}
+                            {(u.nama || u.username).substring(0, 2).toUpperCase()}
                           </div>
-                          <span>{u.username}</span>
+                          <div className="flex flex-col">
+                            <span>{u.nama || u.username}</span>
+                            <span className="text-xs text-slate-400 font-normal">
+                              @{u.username}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="py-3.5 px-6">
@@ -701,13 +801,15 @@ export default function SettingsTab({
                 <div key={u.id} className="p-4 space-y-2">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700 shrink-0">
-                      {u.username.substring(0, 2).toUpperCase()}
+                      {(u.nama || u.username).substring(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-900 text-sm truncate">
-                        {u.username}
+                        {u.nama || u.username}
                       </div>
-                      <div className="text-[11px] text-slate-400">{formattedDate}</div>
+                      <div className="text-[11px] text-slate-400">
+                        @{u.username} · {formattedDate}
+                      </div>
                     </div>
                   </div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold tracking-wide">
@@ -790,6 +892,27 @@ export default function SettingsTab({
                       })
                     }
                     placeholder="contoh: bendahara2 atau ketua_rt"
+                    className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="input-nama-pengurus"
+                  className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+                >
+                  Nama Lengkap <span className="text-rose-600">*</span>
+                </label>
+                <div className="relative">
+                  <UserCircle className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    id="input-nama-pengurus"
+                    type="text"
+                    required
+                    value={userForm.nama}
+                    onChange={(e) => setUserForm({ ...userForm, nama: e.target.value })}
+                    placeholder="contoh: Budi Santoso"
                     className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                   />
                 </div>

@@ -213,7 +213,12 @@ def test_create_user_in_komunitas_requires_ketua_after_bootstrap(client, admin_s
 
     resp = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "bendahara2", "password": "password123", "role": "admin"},
+        json={
+            "username": "bendahara2",
+            "password": "password123",
+            "nama": "Bendahara Dua",
+            "role": "admin",
+        },
         headers=auth_header(ketua_token),
     )
     assert resp.status_code == 201
@@ -224,7 +229,12 @@ def test_create_user_in_komunitas_requires_ketua_after_bootstrap(client, admin_s
     # Duplicate username in same tenant fails
     resp_dup = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "bendahara2", "password": "password123", "role": "admin"},
+        json={
+            "username": "bendahara2",
+            "password": "password123",
+            "nama": "Bendahara Dua",
+            "role": "admin",
+        },
         headers=auth_header(ketua_token),
     )
     assert resp_dup.status_code == 400
@@ -242,14 +252,24 @@ def test_create_user_bootstrap_open_when_no_ketua_yet(client):
     # No auth required for the very first admin account (no ketua yet)
     resp_admin = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "admin-baru", "password": "password123", "role": "admin"},
+        json={
+            "username": "admin-baru",
+            "password": "password123",
+            "nama": "Admin Baru",
+            "role": "admin",
+        },
     )
     assert resp_admin.status_code == 201
 
     # Still no auth required for the first ketua (bootstrap window still open)
     resp_ketua = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "ketua-baru", "password": "password123", "role": "ketua"},
+        json={
+            "username": "ketua-baru",
+            "password": "password123",
+            "nama": "Ketua Baru",
+            "role": "ketua",
+        },
     )
     assert resp_ketua.status_code == 201
     assert resp_ketua.json()["role"] == "ketua"
@@ -257,7 +277,12 @@ def test_create_user_bootstrap_open_when_no_ketua_yet(client):
     # Bootstrap window is now closed: unauthenticated create fails
     resp_closed = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "siapa-saja", "password": "password123", "role": "admin"},
+        json={
+            "username": "siapa-saja",
+            "password": "password123",
+            "nama": "Siapa Saja",
+            "role": "admin",
+        },
     )
     assert resp_closed.status_code == 401
 
@@ -268,7 +293,12 @@ def test_create_user_requires_ketua_not_admin(client, admin_setup):
 
     resp = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "bendahara3", "password": "password123", "role": "admin"},
+        json={
+            "username": "bendahara3",
+            "password": "password123",
+            "nama": "Bendahara Tiga",
+            "role": "admin",
+        },
         headers=auth_header(admin_token),
     )
     assert resp.status_code == 403
@@ -281,7 +311,12 @@ def test_create_user_limits_one_ketua(client, admin_setup):
 
     resp = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "ketua-kedua", "password": "password123", "role": "ketua"},
+        json={
+            "username": "ketua-kedua",
+            "password": "password123",
+            "nama": "Ketua Kedua",
+            "role": "ketua",
+        },
         headers=auth_header(ketua_token),
     )
     assert resp.status_code == 400
@@ -297,17 +332,32 @@ def test_create_user_cross_tenant_ketua_forbidden(client, admin_setup):
     other_id = other_resp.json()["id"]
     client.post(
         f"/api/komunitas/{other_id}/users",
-        json={"username": "admin-lain", "password": "password123", "role": "admin"},
+        json={
+            "username": "admin-lain",
+            "password": "password123",
+            "nama": "Admin Lain",
+            "role": "admin",
+        },
     )
     client.post(
         f"/api/komunitas/{other_id}/users",
-        json={"username": "ketua-lain", "password": "password123", "role": "ketua"},
+        json={
+            "username": "ketua-lain",
+            "password": "password123",
+            "nama": "Ketua Lain",
+            "role": "ketua",
+        },
     )
 
     # Tenant 1's ketua tries to add a user to tenant 2 (other_id)
     resp = client.post(
         f"/api/komunitas/{other_id}/users",
-        json={"username": "hijack", "password": "password123", "role": "admin"},
+        json={
+            "username": "hijack",
+            "password": "password123",
+            "nama": "Hijack",
+            "role": "admin",
+        },
         headers=auth_header(admin_setup["ketua_token"]),
     )
     assert resp.status_code == 403

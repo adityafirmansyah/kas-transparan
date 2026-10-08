@@ -159,7 +159,12 @@ def test_tunggakan_multi_rejects_warga_role(client, admin_setup):
     komunitas_id = admin_setup["komunitas"]["id"]
     client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "warga1", "password": "secret123", "role": "warga"},
+        json={
+            "username": "warga1",
+            "password": "secret123",
+            "nama": "Warga Satu",
+            "role": "warga",
+        },
         headers=auth_headers(admin_setup["ketua_token"]),
     )
     warga_login = client.post(

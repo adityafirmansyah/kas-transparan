@@ -138,7 +138,12 @@ def test_kas_entries_scoped_by_pic_for_admin(client, admin_setup):
     # Ketua creates a second admin
     resp_create_admin2 = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "admin2kas", "password": "password123", "role": "admin"},
+        json={
+            "username": "admin2kas",
+            "password": "password123",
+            "nama": "Admin Dua Kas",
+            "role": "admin",
+        },
         headers=auth_headers(ketua_token),
     )
     assert resp_create_admin2.status_code == 201

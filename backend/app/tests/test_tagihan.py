@@ -220,7 +220,12 @@ def test_batch_pay_role_permissions(client, admin_setup):
     # Create warga user
     client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "warga_batch", "password": "secret123", "role": "warga"},
+        json={
+            "username": "warga_batch",
+            "password": "secret123",
+            "nama": "Warga Batch",
+            "role": "warga",
+        },
         headers=auth_headers(ketua_token),
     )
     warga_login = client.post(
@@ -368,7 +373,12 @@ def test_iuran_ownership_admin_separation(client, admin_setup):
     # Ketua creates a second admin
     resp_create_admin2 = client.post(
         f"/api/komunitas/{komunitas_id}/users",
-        json={"username": "admin2", "password": "password123", "role": "admin"},
+        json={
+            "username": "admin2",
+            "password": "password123",
+            "nama": "Admin Dua",
+            "role": "admin",
+        },
         headers=auth_headers(ketua_token),
     )
     assert resp_create_admin2.status_code == 201

@@ -54,11 +54,21 @@ def admin_setup(client):
 
     client.post(
         f"/api/komunitas/{komunitas['id']}/users",
-        json={"username": "admin1", "password": "secret123", "role": "admin"},
+        json={
+            "username": "admin1",
+            "password": "secret123",
+            "nama": "Admin Satu",
+            "role": "admin",
+        },
     )
     client.post(
         f"/api/komunitas/{komunitas['id']}/users",
-        json={"username": "ketua1", "password": "secret123", "role": "ketua"},
+        json={
+            "username": "ketua1",
+            "password": "secret123",
+            "nama": "Ketua Satu",
+            "role": "ketua",
+        },
     )
 
     admin_login = client.post(
