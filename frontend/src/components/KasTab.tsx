@@ -173,7 +173,7 @@ export default function KasTab(): ReactElement {
           </div>
           <div>
             <span className="text-xs uppercase tracking-wider text-emerald-300 font-semibold block">
-              Saldo Kas Riil Saat Ini
+              {isAdmin ? "Saldo Kas yang Anda Kelola" : "Saldo Kas Riil Saat Ini"}
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-0.5">
               {formatRupiah(saldo)}

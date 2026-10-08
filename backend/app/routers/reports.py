@@ -42,6 +42,7 @@ def monthly_report(
         )
         .all()
     )
+    entries = filter_kas_entries_by_pic(db, entries, user)
 
     total_masuk = 0.0
     total_keluar = 0.0

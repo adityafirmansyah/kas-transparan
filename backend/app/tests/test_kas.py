@@ -202,3 +202,16 @@ def test_kas_entries_scoped_by_pic_for_admin(client, admin_setup):
     ketua_descs = {e["deskripsi"] for e in ketua_entries}
     assert "Donasi dari Admin1" in ketua_descs
     assert "Donasi dari Admin2" in ketua_descs
+
+    # Saldo must reflect the same scoping as the ledger list
+    # Admin1: own manual (50000) + own PIC tagihan payment (15000) = 65000
+    a1_saldo = client.get("/api/kas/saldo", headers=auth_headers(admin1_token)).json()
+    assert a1_saldo["saldo"] == 65000
+
+    # Admin2: own manual only = 70000
+    a2_saldo = client.get("/api/kas/saldo", headers=auth_headers(admin2_token)).json()
+    assert a2_saldo["saldo"] == 70000
+
+    # Ketua: full community total = 50000 + 70000 + 15000 = 135000
+    ketua_saldo = client.get("/api/kas/saldo", headers=auth_headers(ketua_token)).json()
+    assert ketua_saldo["saldo"] == 135000
