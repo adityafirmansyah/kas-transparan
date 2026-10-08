@@ -21,6 +21,26 @@ def test_public_default_komunitas_requires_no_auth(client, admin_setup):
     assert data["nama"] == admin_setup["komunitas"]["nama"]
 
 
+def test_public_default_komunitas_uses_env_override(client, admin_setup, monkeypatch):
+    from app.core.config import settings
+
+    # Create a second komunitas, more recent than admin_setup's
+    other_resp = client.post(
+        "/api/komunitas",
+        json={"nama": "RW Lain", "slug": "rw-lain"},
+    )
+    assert other_resp.status_code == 201
+
+    # Without override: should pick the most-recent (rw-lain)
+    resp_default = client.get("/api/public/default-komunitas")
+    assert resp_default.json()["slug"] == "rw-lain"
+
+    # With PUBLIC_PORTAL_SLUG set: should pick the configured slug instead
+    monkeypatch.setattr(settings, "PUBLIC_PORTAL_SLUG", admin_setup["komunitas"]["slug"])
+    resp_override = client.get("/api/public/default-komunitas")
+    assert resp_override.json()["slug"] == admin_setup["komunitas"]["slug"]
+
+
 def test_public_summary_unknown_slug_404(client):
     resp = client.get("/api/public/tidak-ada/summary")
     assert resp.status_code == 404
