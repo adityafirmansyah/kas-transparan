@@ -28,14 +28,15 @@ router = APIRouter(prefix="/api/public", tags=["public"])
 
 @router.get("/default-komunitas", response_model=DefaultKomunitasOut)
 def get_default_komunitas(db: Session = Depends(get_db)):
-    """Returns the slug/nama of the earliest-created komunitas in this deployment.
+    """Returns the slug/nama of the most recently created komunitas in this deployment.
 
     Used by the Login page to show a working public-portal link without
     requiring authentication. Safe to expose: slug/nama carry no sensitive
-    financial or resident data, and this deployment currently serves a
-    single komunitas per VPS/instance.
+    financial or resident data. Ordered by most-recently-created so that in
+    a single-tenant deployment the real working komunitas (added after the
+    initial demo seed) takes precedence over the demo placeholder.
     """
-    komunitas = db.query(Komunitas).order_by(Komunitas.created_at.asc()).first()
+    komunitas = db.query(Komunitas).order_by(Komunitas.created_at.desc()).first()
     if not komunitas:
         raise HTTPException(status_code=404, detail="Belum ada komunitas terdaftar")
     return DefaultKomunitasOut(slug=komunitas.slug, nama=komunitas.nama)
