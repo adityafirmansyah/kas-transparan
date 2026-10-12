@@ -8,11 +8,13 @@ Core logic:
   KasEntry so the buku kas ledger stays in sync automatically.
 """
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import require_roles
 from app.models.models import (
@@ -36,7 +38,43 @@ from app.schemas.schemas import (
 )
 from app.services.whatsapp import send_payment_receipt_notification
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/tagihan", tags=["tagihan"])
+
+
+def _queue_receipt(
+    background_tasks: BackgroundTasks,
+    *,
+    warga_nama: str,
+    warga_no_hp: str | None,
+    items: list[dict],
+    total_nominal: float,
+    payment_method: str,
+    komunitas_nama: str,
+    paid_at: datetime | None,
+) -> None:
+    """Enqueues a receipt notification, never failing the request.
+
+    The caller has ALREADY committed the payment, so a problem enqueuing the
+    notification must not turn a successful payment into an HTTP 500. This only
+    guards the plumbing; the notifier itself is already non-raising.
+    """
+    if not settings.WHATSAPP_ENABLED or not warga_no_hp:
+        return
+    try:
+        background_tasks.add_task(
+            send_payment_receipt_notification,
+            warga_nama=warga_nama,
+            warga_no_hp=warga_no_hp,
+            items=items,
+            total_nominal=total_nominal,
+            payment_method=payment_method,
+            komunitas_nama=komunitas_nama,
+            paid_at=paid_at,
+        )
+    except Exception as exc:
+        logger.error(f"Failed to enqueue WhatsApp receipt notification: {exc}")
 
 
 @router.post("/generate", response_model=list[TagihanOut], status_code=201)
@@ -178,25 +216,23 @@ def pay_tagihan(
     db.commit()
     db.refresh(tagihan)
 
-    if tagihan.warga and tagihan.warga.no_hp:
-        komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
-        items = [
+    komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
+    _queue_receipt(
+        background_tasks,
+        warga_nama=tagihan.warga.nama,
+        warga_no_hp=tagihan.warga.no_hp,
+        items=[
             {
                 "iuran_nama": tagihan.iuran_type.nama,
                 "periode": tagihan.periode,
                 "nominal": tagihan.nominal,
             }
-        ]
-        background_tasks.add_task(
-            send_payment_receipt_notification,
-            warga_nama=tagihan.warga.nama,
-            warga_no_hp=tagihan.warga.no_hp,
-            items=items,
-            total_nominal=tagihan.nominal,
-            payment_method=payload.payment_method,
-            komunitas_nama=komunitas_nama,
-            paid_at=tagihan.paid_at,
-        )
+        ],
+        total_nominal=tagihan.nominal,
+        payment_method=payload.payment_method,
+        komunitas_nama=komunitas_nama,
+        paid_at=tagihan.paid_at,
+    )
 
     return tagihan
 
@@ -290,17 +326,16 @@ def batch_pay_tagihan(
     komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
     for group in warga_groups.values():
         w = group["warga"]
-        if w and w.no_hp:
-            background_tasks.add_task(
-                send_payment_receipt_notification,
-                warga_nama=w.nama,
-                warga_no_hp=w.no_hp,
-                items=group["items"],
-                total_nominal=group["total"],
-                payment_method=payload.payment_method,
-                komunitas_nama=komunitas_nama,
-                paid_at=now,
-            )
+        _queue_receipt(
+            background_tasks,
+            warga_nama=w.nama if w else "",
+            warga_no_hp=w.no_hp if w else None,
+            items=group["items"],
+            total_nominal=group["total"],
+            payment_method=payload.payment_method,
+            komunitas_nama=komunitas_nama,
+            paid_at=now,
+        )
 
     return BatchPayTagihanResponse(
         paid_count=len(paid_list),
@@ -414,26 +449,24 @@ def record_future_payment(
     for t in paid_list:
         db.refresh(t)
 
-    if warga.no_hp:
-        komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
-        items = [
+    komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
+    _queue_receipt(
+        background_tasks,
+        warga_nama=warga.nama,
+        warga_no_hp=warga.no_hp,
+        items=[
             {
                 "iuran_nama": t.iuran_type.nama,
                 "periode": t.periode,
                 "nominal": t.nominal,
             }
             for t in paid_list
-        ]
-        background_tasks.add_task(
-            send_payment_receipt_notification,
-            warga_nama=warga.nama,
-            warga_no_hp=warga.no_hp,
-            items=items,
-            total_nominal=total_nominal,
-            payment_method=payload.payment_method,
-            komunitas_nama=komunitas_nama,
-            paid_at=now,
-        )
+        ],
+        total_nominal=total_nominal,
+        payment_method=payload.payment_method,
+        komunitas_nama=komunitas_nama,
+        paid_at=now,
+    )
 
     return RecordFuturePaymentResponse(
         warga_id=warga.id,

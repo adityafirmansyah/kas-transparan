@@ -58,6 +58,31 @@ def test_format_rupiah():
     assert format_rupiah(0) == "Rp 0"
 
 
+def test_format_rupiah_rounds_half_up_so_lines_sum_to_total():
+    """Item lines must sum to the printed total (plain int() truncation breaks this)."""
+    from app.services.whatsapp import format_rupiah
+
+    # 3 x 1499.5 = 4498.5 -> lines must sum to the total, not 100 short
+    items = [format_rupiah(1499.5)] * 3
+    total = format_rupiah(4498.5)
+    assert items == ["Rp 1.500"] * 3  # rounds up, not truncates to 1.499
+    assert total == "Rp 4.499"  # 4498.5 rounds half-up
+    summed = sum(int(s.replace("Rp ", "").replace(".", "")) for s in items)
+    assert summed == 4500  # and the three lines are consistent with each other
+
+
+def test_mask_phone_number():
+    from app.services.whatsapp import mask_phone_number
+
+    assert mask_phone_number("6281234567890") == "6281****7890"
+    assert mask_phone_number("+62 812-3456-7890") == "6281****7890"
+    assert mask_phone_number("short") == "***"
+    assert mask_phone_number(None) == "***"
+    assert mask_phone_number(6281234567890) == "***"  # type: ignore[arg-type]  # non-str not logged raw
+    # The full number must never survive masking
+    assert "1234567890" not in mask_phone_number("6281234567890")
+
+
 def test_send_whatsapp_message_disabled():
     with patch.object(settings, "WHATSAPP_ENABLED", False):
         res = send_whatsapp_message("081234567890", "Test message")
@@ -193,6 +218,154 @@ def test_api_key_never_logged(mock_logger):
     assert "SUPER_SECRET_KEY_XYZ" not in rendered
 
 
+def test_phone_number_is_masked_in_logs():
+    """Resident phone numbers are personal data; logs must carry only the mask.
+
+    This asserts the CALL SITE actually masks, not merely that mask_phone_number()
+    works in isolation — reverting the log statement to the raw number must fail here.
+    """
+    import logging as _logging
+
+    import app.services.whatsapp as wa
+
+    records: list[str] = []
+
+    class _Capture(_logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    handler = _Capture()
+    wa.logger.addHandler(handler)
+    wa.logger.setLevel(_logging.DEBUG)
+    try:
+        with (
+            patch.object(settings, "WHATSAPP_ENABLED", True),
+            patch.object(settings, "WHATSAPP_GATEWAY_URL", "https://gateway.example.com/send"),
+            patch.object(settings, "WHATSAPP_API_KEY", "k"),
+            patch("app.services.whatsapp.httpx.Client") as mock_client_cls,
+        ):
+            ok = MagicMock()
+            ok.status_code = 200
+            mock_client_cls.return_value.__enter__.return_value.post.return_value = ok
+            # success path + invalid-number path both log
+            assert wa.send_whatsapp_message("081234567890", "hi") is True
+            assert wa.send_whatsapp_message("not-a-phone", "x") is False
+    finally:
+        wa.logger.removeHandler(handler)
+
+    joined = "\n".join(records)
+    assert joined, "expected the service to log something"
+    # The full MSISDN must never appear, in any form it was passed in.
+    assert "6281234567890" not in joined
+    assert "081234567890" not in joined
+    assert "not-a-phone" not in joined
+    # ...while the mask is present, proving logging did happen.
+    assert "6281****7890" in joined
+
+
+def test_whatsapp_disabled_by_default():
+    """The shipped default must be OFF — this is the load-bearing safety property."""
+    from app.core.config import Settings
+
+    fresh = Settings(_env_file=None)
+    assert fresh.WHATSAPP_ENABLED is False
+    assert fresh.WHATSAPP_GATEWAY_URL == ""
+    assert fresh.WHATSAPP_API_KEY == ""
+
+
+def test_null_client_is_never_constructed_when_flag_off(client, admin_setup):
+    """Flag off => paying a bill must not even construct an HTTP client.
+
+    A poisoned httpx.Client proves the no-op end to end: if any code path tried
+    to make a request, construction itself raises.
+    """
+    token = admin_setup["admin_token"]
+    w_resp = client.post(
+        "/api/warga",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"nama": "No Notify", "no_rumah": "E-09", "no_hp": "081234567899"},
+    )
+    assert w_resp.status_code == 201
+    warga_id = w_resp.json()["id"]
+
+    i_resp = client.post(
+        "/api/iuran-types",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"nama": "Iuran Silent", "nominal": 10000, "tipe": "wajib"},
+    )
+    assert i_resp.status_code == 201
+    iuran_id = i_resp.json()["id"]
+
+    g_resp = client.post(
+        "/api/tagihan/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"iuran_type_id": iuran_id, "periode": "2026-10"},
+    )
+    assert g_resp.status_code == 201
+    my_tagihan = next(t for t in g_resp.json() if t["warga_id"] == warga_id)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("httpx.Client was constructed while WhatsApp was disabled")
+
+    with (
+        patch.object(settings, "WHATSAPP_ENABLED", False),
+        patch("app.services.whatsapp.httpx.Client", side_effect=_boom),
+    ):
+        p_resp = client.post(
+            f"/api/tagihan/{my_tagihan['id']}/pay",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"payment_method": "tunai"},
+        )
+        assert p_resp.status_code == 200
+        assert p_resp.json()["status"] == "lunas"
+
+
+@patch("app.routers.tagihan.send_payment_receipt_notification")
+def test_dispatch_plumbing_failure_does_not_fail_payment(mock_notify, client, admin_setup):
+    """A failure in the enqueue plumbing must not 500 an already-committed payment."""
+    token = admin_setup["admin_token"]
+    w_resp = client.post(
+        "/api/warga",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"nama": "Plumbing Fail", "no_rumah": "F-01", "no_hp": "081234567877"},
+    )
+    assert w_resp.status_code == 201
+    warga_id = w_resp.json()["id"]
+
+    i_resp = client.post(
+        "/api/iuran-types",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"nama": "Iuran Plumbing", "nominal": 12000, "tipe": "wajib"},
+    )
+    assert i_resp.status_code == 201
+    iuran_id = i_resp.json()["id"]
+
+    g_resp = client.post(
+        "/api/tagihan/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"iuran_type_id": iuran_id, "periode": "2026-10"},
+    )
+    assert g_resp.status_code == 201
+    my_tagihan = next(t for t in g_resp.json() if t["warga_id"] == warga_id)
+
+    with (
+        patch.object(settings, "WHATSAPP_ENABLED", True),
+        patch.object(settings, "WHATSAPP_GATEWAY_URL", "https://gateway.example.com/send"),
+        patch(
+            "app.routers.tagihan.BackgroundTasks.add_task",
+            side_effect=RuntimeError("background plumbing exploded"),
+        ),
+    ):
+        p_resp = client.post(
+            f"/api/tagihan/{my_tagihan['id']}/pay",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"payment_method": "tunai"},
+        )
+        # Payment already committed: the response must still be a success.
+        assert p_resp.status_code == 200
+        assert p_resp.json()["status"] == "lunas"
+
+
 @patch("app.routers.tagihan.send_payment_receipt_notification")
 def test_pay_tagihan_triggers_whatsapp(mock_notify, client, admin_setup):
     token = admin_setup["admin_token"]
@@ -225,11 +398,12 @@ def test_pay_tagihan_triggers_whatsapp(mock_notify, client, admin_setup):
     my_tagihan = next(t for t in tagihans if t["warga_id"] == warga_id)
 
     # Pay tagihan
-    p_resp = client.post(
-        f"/api/tagihan/{my_tagihan['id']}/pay",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"payment_method": "tunai"},
-    )
+    with patch.object(settings, "WHATSAPP_ENABLED", True):
+        p_resp = client.post(
+            f"/api/tagihan/{my_tagihan['id']}/pay",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"payment_method": "tunai"},
+        )
     assert p_resp.status_code == 200
 
     # Verify notification task was enqueued
@@ -277,11 +451,12 @@ def test_batch_pay_triggers_whatsapp(mock_notify, client, admin_setup):
     t2 = next(t for t in g2.json() if t["warga_id"] == warga_id)
 
     # Batch pay both
-    p_resp = client.post(
-        "/api/tagihan/batch-pay",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"tagihan_ids": [t1["id"], t2["id"]], "payment_method": "transfer"},
-    )
+    with patch.object(settings, "WHATSAPP_ENABLED", True):
+        p_resp = client.post(
+            "/api/tagihan/batch-pay",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"tagihan_ids": [t1["id"], t2["id"]], "payment_method": "transfer"},
+        )
     assert p_resp.status_code == 200
 
     # Notification should be sent once aggregated for Ahmad Yani
@@ -315,18 +490,19 @@ def test_future_pay_triggers_whatsapp(mock_notify, client, admin_setup):
     iuran_id = i_resp.json()["id"]
 
     # Future pay for 2 periods
-    p_resp = client.post(
-        "/api/tagihan/future-pay",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "warga_id": warga_id,
-            "items": [
-                {"periode": "2027-01", "iuran_type_id": iuran_id},
-                {"periode": "2027-02", "iuran_type_id": iuran_id},
-            ],
-            "payment_method": "transfer",
-        },
-    )
+    with patch.object(settings, "WHATSAPP_ENABLED", True):
+        p_resp = client.post(
+            "/api/tagihan/future-pay",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "warga_id": warga_id,
+                "items": [
+                    {"periode": "2027-01", "iuran_type_id": iuran_id},
+                    {"periode": "2027-02", "iuran_type_id": iuran_id},
+                ],
+                "payment_method": "transfer",
+            },
+        )
     assert p_resp.status_code == 200
 
     mock_notify.assert_called_once()

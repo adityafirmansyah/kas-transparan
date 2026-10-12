@@ -1,13 +1,14 @@
 """WhatsApp Notification Service for kas-transparan.
 
-Dispatches payment receipts to residents through a configurable HTTP gateway
-(any service accepting ``POST {"to": ..., "message": ...}`` with an API key
-header), or through a self-hosted Baileys-compatible bridge.
+Dispatches payment receipts to residents through a configurable HTTP gateway:
+any service accepting ``POST {"to": "<msisdn>", "message": "<text>"}`` with an
+API key header.
 """
 
 import logging
 import re
 from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -28,9 +29,8 @@ def normalize_phone_number(phone: str | None) -> str | None:
     Rejects non-Indonesian numbers, landlines, and malformed input so a stray
     value in ``Warga.no_hp`` can never be dispatched as a WhatsApp recipient.
     """
-    if not phone:
+    if not isinstance(phone, str):
         return None
-    # Strip any whitespace, dashes, pluses, dots, brackets
     cleaned = re.sub(r"[^0-9]", "", phone.strip())
     if not cleaned:
         return None
@@ -44,9 +44,28 @@ def normalize_phone_number(phone: str | None) -> str | None:
     return cleaned
 
 
+def mask_phone_number(phone: str | None) -> str:
+    """Masks a phone number for logs (e.g. 6281****7890).
+
+    Resident phone numbers are personal data, so they must never be written to
+    logs in full.
+    """
+    if not isinstance(phone, str):
+        return "***"
+    digits = re.sub(r"[^0-9]", "", phone)
+    if len(digits) < 7:
+        return "***"
+    return f"{digits[:4]}****{digits[-4:]}"
+
+
 def format_rupiah(nominal: float) -> str:
-    """Formats float nominal to Indonesian Rupiah string (e.g. Rp 50.000)."""
-    return f"Rp {int(nominal):,}".replace(",", ".")
+    """Formats nominal as Indonesian Rupiah, rounding half-up to whole rupiah.
+
+    Uses Decimal so printed item lines always sum to the printed total (plain
+    ``int()`` truncates, which can make the receipt appear to not add up).
+    """
+    value = Decimal(str(nominal)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return f"Rp {int(value):,}".replace(",", ".")
 
 
 def format_wib_time(moment: datetime) -> str:
@@ -62,7 +81,11 @@ def format_wib_time(moment: datetime) -> str:
 
 
 def send_whatsapp_message(to: str, message: str) -> bool:
-    """Sends a text message through the configured WhatsApp gateway."""
+    """Sends a text message through the configured WhatsApp gateway.
+
+    Never raises: any transport error is logged and reported as ``False`` so a
+    notification failure can never propagate into a payment transaction.
+    """
     if not settings.WHATSAPP_ENABLED:
         logger.debug("WhatsApp notification skipped: WHATSAPP_ENABLED is False")
         return False
@@ -73,7 +96,9 @@ def send_whatsapp_message(to: str, message: str) -> bool:
 
     recipient = normalize_phone_number(to)
     if not recipient:
-        logger.warning(f"WhatsApp notification skipped: Invalid phone number '{to}'")
+        logger.warning(
+            f"WhatsApp notification skipped: invalid phone number '{mask_phone_number(to)}'"
+        )
         return False
 
     headers = {
@@ -87,6 +112,7 @@ def send_whatsapp_message(to: str, message: str) -> bool:
         "message": message,
     }
 
+    masked = mask_phone_number(recipient)
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.post(
@@ -96,14 +122,14 @@ def send_whatsapp_message(to: str, message: str) -> bool:
             )
             if resp.status_code >= 400:
                 logger.error(
-                    f"Failed to send WA to {recipient}: HTTP {resp.status_code} - {resp.text[:200]}"
+                    f"Failed to send WA to {masked}: HTTP {resp.status_code} - {resp.text[:200]}"
                 )
                 return False
 
-            logger.info(f"WhatsApp message sent successfully to {recipient}")
+            logger.info(f"WhatsApp message sent successfully to {masked}")
             return True
     except Exception as exc:
-        logger.error(f"Error dispatching WhatsApp message to {recipient}: {exc}")
+        logger.error(f"Error dispatching WhatsApp message to {masked}: {exc}")
         return False
 
 
@@ -137,7 +163,7 @@ def send_payment_receipt_notification(
             item_rows.append(f"• {iuran_nama} ({periode}): {format_rupiah(nominal)}")
 
         items_text = "\n".join(item_rows)
-        method_label = "Tunai" if (payment_method or "").lower() == "tunai" else "Transfer Bank"
+        method_label = "Tunai" if str(payment_method or "").lower() == "tunai" else "Transfer Bank"
         time_str = format_wib_time(paid_at)
 
         message = (
@@ -152,7 +178,7 @@ def send_payment_receipt_notification(
             f"Terima kasih telah berkontribusi menjaga transparansi kas lingkungan kita! 🙏"
         )
     except Exception as exc:
-        logger.error(f"Error formatting WhatsApp receipt for '{warga_nama}': {exc}")
+        logger.error(f"Error formatting WhatsApp receipt for warga '{warga_nama}': {exc}")
         return False
 
     return send_whatsapp_message(warga_no_hp, message)

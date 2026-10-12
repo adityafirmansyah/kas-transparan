@@ -52,7 +52,9 @@ once the UI is running against real data)_
 
 ### Explicitly out of scope for v1 (locked decisions)
 
-- No WhatsApp bot / WA reminders (planned for a later phase).
+- No WhatsApp *bot* / two-way chat (planned for a later phase). One-way payment
+  receipt notifications are available and opt-in — see
+  [WhatsApp notifications](#whatsapp-notifications) below.
 - No payment gateway integration (no QRIS/Midtrans/Xendit) — manual admin
   entry + optional proof-of-transfer image, no OCR.
 - No subscription tiers / paywalls / freemium limits — this is free and
@@ -198,6 +200,30 @@ npm run build           # tsc -b && vite build — also fails on type errors
 All three (`lint`, `format:check`, `typecheck`) also run on every PR via
 GitHub Actions (`.github/workflows/lint.yml`, `frontend-lint` job).
 
+## WhatsApp notifications
+
+Optional, **disabled by default**. When enabled, recording a payment sends the
+resident an itemised receipt over WhatsApp.
+
+Point the backend at any HTTP gateway that accepts:
+
+```
+POST <WHATSAPP_GATEWAY_URL>
+X-API-Key: <WHATSAPP_API_KEY>
+{"to": "<msisdn>", "message": "<text>"}
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `WHATSAPP_ENABLED` | `false` | Master switch. Nothing is sent unless this is `true`. |
+| `WHATSAPP_GATEWAY_URL` | *(empty)* | Your gateway's send endpoint. No default endpoint is shipped. |
+| `WHATSAPP_API_KEY` | *(empty)* | Sent as `X-API-Key` when set. |
+
+Notifications fire after the payment is committed, in a FastAPI background
+task — a gateway outage, an unreachable host, or an invalid number can never
+fail or roll back a payment. Receipts are dispatched from single-pay,
+batch-pay (one aggregated message per resident) and future-pay.
+
 ## Getting started with a new komunitas
 
 1. `POST /api/komunitas` with `{ "nama": "RT 05 Sukamaju", "slug": "rt05-sukamaju" }`
@@ -252,9 +278,9 @@ This is an open-source project and contributions are welcome.
 
 If you find this project helpful for your neighborhood or community, consider [sponsoring the maintainer](https://github.com/sponsors/adityafirmansyah) to support ongoing hosting and development.
 
-Ideas for future phases (not yet built): WhatsApp reminder bot, QRIS/payment
-gateway integration, warga self-service portal, OCR for payment proof
-verification.
+Ideas for future phases (not yet built): WhatsApp reminder *bot* (two-way),
+QRIS/payment gateway integration, warga self-service portal, OCR for payment
+proof verification.
 
 ## License
 
