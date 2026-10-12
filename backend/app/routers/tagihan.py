@@ -10,7 +10,7 @@ Core logic:
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -34,6 +34,7 @@ from app.schemas.schemas import (
     TagihanOut,
     TagihanWithWargaOut,
 )
+from app.services.whatsapp import send_payment_receipt_notification
 
 router = APIRouter(prefix="/api/tagihan", tags=["tagihan"])
 
@@ -138,6 +139,7 @@ def list_tagihan(
 def pay_tagihan(
     tagihan_id: str,
     payload: PayTagihanRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
@@ -175,12 +177,34 @@ def pay_tagihan(
     db.add(kas_entry)
     db.commit()
     db.refresh(tagihan)
+
+    if tagihan.warga and tagihan.warga.no_hp:
+        komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
+        items = [
+            {
+                "iuran_nama": tagihan.iuran_type.nama,
+                "periode": tagihan.periode,
+                "nominal": tagihan.nominal,
+            }
+        ]
+        background_tasks.add_task(
+            send_payment_receipt_notification,
+            warga_nama=tagihan.warga.nama,
+            warga_no_hp=tagihan.warga.no_hp,
+            items=items,
+            total_nominal=tagihan.nominal,
+            payment_method=payload.payment_method,
+            komunitas_nama=komunitas_nama,
+            paid_at=tagihan.paid_at,
+        )
+
     return tagihan
 
 
 @router.post("/batch-pay", response_model=BatchPayTagihanResponse)
 def batch_pay_tagihan(
     payload: BatchPayTagihanRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
@@ -245,6 +269,39 @@ def batch_pay_tagihan(
     for t in paid_list:
         db.refresh(t)
 
+    # Group by warga to dispatch a single aggregated receipt per resident
+    warga_groups: dict[str, dict] = {}
+    for t in paid_list:
+        if t.warga_id not in warga_groups:
+            warga_groups[t.warga_id] = {
+                "warga": t.warga,
+                "items": [],
+                "total": 0.0,
+            }
+        warga_groups[t.warga_id]["items"].append(
+            {
+                "iuran_nama": t.iuran_type.nama,
+                "periode": t.periode,
+                "nominal": t.nominal,
+            }
+        )
+        warga_groups[t.warga_id]["total"] += t.nominal
+
+    komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
+    for group in warga_groups.values():
+        w = group["warga"]
+        if w and w.no_hp:
+            background_tasks.add_task(
+                send_payment_receipt_notification,
+                warga_nama=w.nama,
+                warga_no_hp=w.no_hp,
+                items=group["items"],
+                total_nominal=group["total"],
+                payment_method=payload.payment_method,
+                komunitas_nama=komunitas_nama,
+                paid_at=now,
+            )
+
     return BatchPayTagihanResponse(
         paid_count=len(paid_list),
         total_nominal=total_nominal,
@@ -255,6 +312,7 @@ def batch_pay_tagihan(
 @router.post("/future-pay", response_model=RecordFuturePaymentResponse)
 def record_future_payment(
     payload: RecordFuturePaymentRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin")),
 ):
@@ -355,6 +413,27 @@ def record_future_payment(
     db.commit()
     for t in paid_list:
         db.refresh(t)
+
+    if warga.no_hp:
+        komunitas_nama = user.komunitas.nama if user.komunitas else "Kas Transparan"
+        items = [
+            {
+                "iuran_nama": t.iuran_type.nama,
+                "periode": t.periode,
+                "nominal": t.nominal,
+            }
+            for t in paid_list
+        ]
+        background_tasks.add_task(
+            send_payment_receipt_notification,
+            warga_nama=warga.nama,
+            warga_no_hp=warga.no_hp,
+            items=items,
+            total_nominal=total_nominal,
+            payment_method=payload.payment_method,
+            komunitas_nama=komunitas_nama,
+            paid_at=now,
+        )
 
     return RecordFuturePaymentResponse(
         warga_id=warga.id,

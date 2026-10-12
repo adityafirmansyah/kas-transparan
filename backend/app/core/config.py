@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     AUTO_SEED: bool = True
     PUBLIC_PORTAL_SLUG: str = ""
+    WHATSAPP_ENABLED: bool = False
+    WHATSAPP_GATEWAY_URL: str = ""
+    WHATSAPP_API_KEY: str = ""
 
 
 settings = Settings()
