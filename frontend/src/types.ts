@@ -108,7 +108,6 @@ export interface Tagihan {
   nominal: number;
   status: TagihanStatus;
   payment_method: PaymentMethod | null;
-  proof_image_path: string | null;
   paid_at: string | null;
 }
 
@@ -188,7 +187,6 @@ export interface TunggakanMulti {
 export interface BatchPayTagihanRequest {
   tagihan_ids: string[];
   payment_method: PaymentMethod;
-  proof_image_path?: string;
 }
 
 export interface BatchPayTagihanResponse {
@@ -206,7 +204,6 @@ export interface RecordFuturePaymentRequest {
   warga_id: string;
   items: FuturePaymentItem[];
   payment_method: PaymentMethod;
-  proof_image_path?: string;
 }
 
 export interface RecordFuturePaymentResponse {

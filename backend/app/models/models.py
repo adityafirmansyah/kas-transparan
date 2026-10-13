@@ -159,7 +159,6 @@ class Tagihan(Base):
     nominal = Column(Float, nullable=False)
     status = Column(SAEnum(TagihanStatus), nullable=False, default=TagihanStatus.belum_bayar)
     payment_method = Column(SAEnum(PaymentMethod), nullable=True)
-    proof_image_path = Column(String, nullable=True)
     paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -145,13 +145,11 @@ class GenerateTagihanRequest(BaseModel):
 
 class PayTagihanRequest(BaseModel):
     payment_method: str  # "tunai" or "transfer"
-    proof_image_path: str | None = None
 
 
 class BatchPayTagihanRequest(BaseModel):
     tagihan_ids: list[str]
     payment_method: str  # "tunai" or "transfer"
-    proof_image_path: str | None = None
 
 
 class TagihanOut(BaseModel):
@@ -163,7 +161,6 @@ class TagihanOut(BaseModel):
     nominal: float
     status: str
     payment_method: str | None = None
-    proof_image_path: str | None = None
     paid_at: datetime | None = None
 
 
@@ -182,7 +179,6 @@ class RecordFuturePaymentRequest(BaseModel):
     warga_id: str
     items: list[FuturePaymentItem]
     payment_method: str  # "tunai" or "transfer"
-    proof_image_path: str | None = None
 
 
 class RecordFuturePaymentResponse(BaseModel):
