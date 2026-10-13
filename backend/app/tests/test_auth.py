@@ -119,3 +119,27 @@ def test_change_password_requires_auth(client):
         json={"current_password": "x", "new_password": "newsecret456"},
     )
     assert resp.status_code == 401
+
+
+def test_expired_token_returns_401(client, admin_setup):
+    from app.core.security import create_access_token, decode_access_token
+
+    # Get admin user ID from the valid token payload
+    valid_payload = decode_access_token(admin_setup["admin_token"])
+    assert valid_payload is not None
+    admin_id = valid_payload["sub"]
+
+    # Generate an already-expired token (-5 minutes)
+    expired_token = create_access_token(
+        data={"sub": admin_id},
+        expires_minutes=-5,
+    )
+    resp = client.get("/api/auth/me", headers=auth_headers(expired_token))
+    assert resp.status_code == 401
+    assert "expired" in resp.json()["detail"].lower()
+
+
+def test_malformed_token_returns_401(client):
+    resp = client.get("/api/auth/me", headers=auth_headers("this.is.a.malformed.token"))
+    assert resp.status_code == 401
+    assert "invalid" in resp.json()["detail"].lower()

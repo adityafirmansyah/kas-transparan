@@ -13,6 +13,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      // Don't trigger redirect on failed login attempts (/api/auth/login)
+      const url = error.config?.url || "";
+      if (!url.includes("/api/auth/login")) {
+        clearSession();
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export function setSession({
   access_token,
   role,
@@ -84,6 +101,13 @@ export async function downloadFile(
   const response = await fetch(fullUrl, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  if (response.status === 401) {
+    clearSession();
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+    throw new Error("Sesi telah berakhir, silakan login kembali.");
+  }
   if (!response.ok) {
     throw new Error(`Gagal mengunduh file (${response.status})`);
   }
