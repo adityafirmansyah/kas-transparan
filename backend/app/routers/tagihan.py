@@ -164,7 +164,6 @@ def list_tagihan(
                 nominal=t.nominal,
                 status=t.status.value,
                 payment_method=t.payment_method.value if t.payment_method else None,
-                proof_image_path=t.proof_image_path,
                 paid_at=t.paid_at,
                 warga_nama=t.warga.nama,
                 iuran_nama=t.iuran_type.nama,
@@ -198,7 +197,6 @@ def pay_tagihan(
 
     tagihan.status = TagihanStatus.lunas
     tagihan.payment_method = PaymentMethod(payload.payment_method)
-    tagihan.proof_image_path = payload.proof_image_path
     tagihan.paid_at = datetime.utcnow()
 
     kas_entry = KasEntry(
@@ -285,7 +283,6 @@ def batch_pay_tagihan(
     for t in tagihans:
         t.status = TagihanStatus.lunas
         t.payment_method = method
-        t.proof_image_path = payload.proof_image_path
         t.paid_at = now
 
         kas_entry = KasEntry(
@@ -416,7 +413,6 @@ def record_future_payment(
                 raise HTTPException(status_code=400, detail=msg)
             tagihan.status = TagihanStatus.lunas
             tagihan.payment_method = method
-            tagihan.proof_image_path = payload.proof_image_path
             tagihan.paid_at = now
         else:
             tagihan = Tagihan(
@@ -427,7 +423,6 @@ def record_future_payment(
                 nominal=iuran.nominal,
                 status=TagihanStatus.lunas,
                 payment_method=method,
-                proof_image_path=payload.proof_image_path,
                 paid_at=now,
             )
             db.add(tagihan)

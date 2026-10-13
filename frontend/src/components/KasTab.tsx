@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactElement } from "react";
 import {
   BookOpen,
   TrendingUp,
@@ -15,9 +15,12 @@ import {
   Filter,
   Download,
   FileSpreadsheet,
+  ImagePlus,
+  Receipt,
 } from "lucide-react";
-import { api, downloadFile, errorMessage, formatRupiah, getSession } from "../api";
+import { api, downloadFile, errorMessage, formatRupiah, getSession, uploadReceipt } from "../api";
 import type { ApprovalStatus, KasEntry, SaldoResponse } from "../types";
+import ReceiptViewer from "./ReceiptViewer";
 
 interface PemasukanFormState {
   kategori: string;
@@ -31,6 +34,7 @@ interface PengeluaranFormState {
   deskripsi: string;
   nominal: string;
   tanggal: string;
+  receipt_image_path: string;
 }
 
 function todayISO(): string {
@@ -48,9 +52,12 @@ const EMPTY_PENGELUARAN: PengeluaranFormState = {
   deskripsi: "",
   nominal: "",
   tanggal: todayISO(),
+  receipt_image_path: "",
 };
 
 type KasFilter = "semua" | "pemasukan" | "pengeluaran" | "pending";
+
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
 
 export default function KasTab(): ReactElement {
   const { role } = getSession();
@@ -65,6 +72,10 @@ export default function KasTab(): ReactElement {
   const [savingPengeluaran, setSavingPengeluaran] = useState(false);
   const [filter, setFilter] = useState<KasFilter>("semua");
   const [approvalActionId, setApprovalActionId] = useState<string | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<{ path: string; title: string } | null>(
+    null
+  );
 
   // Export states (Admin only)
   const [exportingKas, setExportingKas] = useState<"csv" | "xlsx" | null>(null);
@@ -149,6 +160,33 @@ export default function KasTab(): ReactElement {
       setError(errorMessage(err, "Gagal memproses approval"));
     } finally {
       setApprovalActionId(null);
+    }
+  }
+
+  async function handleReceiptFile(e: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = e.target.files?.[0];
+    // Allow re-selecting the same file after a failed upload.
+    e.target.value = "";
+    if (!file) return;
+
+    setError("");
+    if (!file.type.startsWith("image/")) {
+      setError("Bukti struk harus berupa file gambar (JPG, PNG, atau WEBP).");
+      return;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      setError("Ukuran bukti struk maksimal 5 MB.");
+      return;
+    }
+
+    setUploadingReceipt(true);
+    try {
+      const path = await uploadReceipt(file);
+      setPengeluaranForm((prev) => ({ ...prev, receipt_image_path: path }));
+    } catch (err) {
+      setError(errorMessage(err, "Gagal mengunggah bukti struk"));
+    } finally {
+      setUploadingReceipt(false);
     }
   }
 
@@ -380,6 +418,73 @@ export default function KasTab(): ReactElement {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Bukti Struk / Nota
+                  <span className="ml-1 font-normal text-slate-400">(opsional, maks 5 MB)</span>
+                </label>
+
+                {pengeluaranForm.receipt_image_path ? (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50">
+                    <span className="inline-flex items-center gap-2 min-w-0 text-xs font-semibold text-emerald-800">
+                      <Receipt className="w-4 h-4 shrink-0" />
+                      <span className="truncate">Struk terlampir</span>
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewingReceipt({
+                            path: pengeluaranForm.receipt_image_path,
+                            title: pengeluaranForm.deskripsi || "Bukti struk",
+                          })
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 transition"
+                      >
+                        Lihat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPengeluaranForm({ ...pengeluaranForm, receipt_image_path: "" })
+                        }
+                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition"
+                        aria-label="Hapus lampiran struk"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    className={`flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl border border-dashed text-sm font-medium cursor-pointer transition ${
+                      uploadingReceipt
+                        ? "border-slate-300 bg-slate-50 text-slate-400 cursor-wait"
+                        : "border-slate-300 bg-slate-50 text-slate-600 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50/50"
+                    }`}
+                  >
+                    {uploadingReceipt ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Mengunggah struk...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus className="w-4 h-4" />
+                        <span>Unggah foto nota / struk</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleReceiptFile}
+                      disabled={uploadingReceipt}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={savingPengeluaran}
@@ -555,7 +660,24 @@ export default function KasTab(): ReactElement {
                         {e.kategori}
                       </td>
                       <td className="py-3.5 px-4 text-xs text-slate-800 font-medium">
-                        {e.deskripsi}
+                        <div className="flex items-center gap-2">
+                          <span>{e.deskripsi}</span>
+                          {e.receipt_image_path && (
+                            <button
+                              onClick={() =>
+                                setViewingReceipt({
+                                  path: e.receipt_image_path as string,
+                                  title: e.deskripsi,
+                                })
+                              }
+                              className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-md bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition"
+                              title="Lihat bukti struk / nota"
+                            >
+                              <Receipt className="w-3 h-3" />
+                              <span>Nota</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold">
                         <span
@@ -686,6 +808,20 @@ export default function KasTab(): ReactElement {
                       {e.deskripsi}
                     </div>
                     <div className="text-xs text-slate-500 capitalize">{e.kategori}</div>
+                    {e.receipt_image_path && (
+                      <button
+                        onClick={() =>
+                          setViewingReceipt({
+                            path: e.receipt_image_path as string,
+                            title: e.deskripsi,
+                          })
+                        }
+                        className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] text-[11px] font-semibold rounded-lg bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Lihat Nota</span>
+                      </button>
+                    )}
                   </div>
                   <span
                     className={`shrink-0 font-mono font-bold text-sm ${
@@ -762,6 +898,14 @@ export default function KasTab(): ReactElement {
           )}
         </div>
       </div>
+
+      {viewingReceipt && (
+        <ReceiptViewer
+          path={viewingReceipt.path}
+          title={viewingReceipt.title}
+          onClose={() => setViewingReceipt(null)}
+        />
+      )}
     </div>
   );
 }

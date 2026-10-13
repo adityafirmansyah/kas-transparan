@@ -33,7 +33,8 @@ once the UI is running against real data)_
   - Advance / upfront payment recording ("Bayar Dimuka") for residents paying several months ahead, automatically creating bills and marking them paid.
 - **Buku kas (cash ledger)**:
   - Pemasukan (income, auto-created from tagihan payments or manual like donasi/hibah).
-  - Pengeluaran (expense, with category, date picker, receipt attachment image).
+  - Pengeluaran (expense, with category, date picker, and an optional photo of the
+    physical receipt / nota so the ketua can inspect it before approving).
   - Running saldo (balance) calculation automatically maintained.
 - **Pengeluaran approval workflow**: every expense starts `pending` and must
   be `approved` (or `rejected`) by the `ketua` (chair) role before it counts toward
@@ -56,7 +57,7 @@ once the UI is running against real data)_
   receipt notifications are available and opt-in — see
   [WhatsApp notifications](#whatsapp-notifications) below.
 - No payment gateway integration (no QRIS/Midtrans/Xendit) — manual admin
-  entry + optional proof-of-transfer image, no OCR.
+  entry of dues payment method (tunai or transfer), no OCR.
 - No subscription tiers / paywalls / freemium limits — this is free and
   open-source, full stop.
 - Warga self-service login is a stretch goal, not required for v1 (minimum
@@ -223,6 +224,19 @@ Notifications fire after the payment is committed, in a FastAPI background
 task — a gateway outage, an unreachable host, or an invalid number can never
 fail or roll back a payment. Receipts are dispatched from single-pay,
 batch-pay (one aggregated message per resident) and future-pay.
+
+## Expense receipts (bukti struk)
+
+Recording a pengeluaran accepts an optional photo of the physical nota:
+
+- `POST /api/uploads/receipt` — multipart upload, admin only. Accepts JPG, PNG
+  or WEBP up to 5 MB and returns `{ "receipt_image_path": "/api/uploads/receipts/<file>" }`.
+- `GET /api/uploads/receipts/<file>` — serves the stored image to admin **and**
+  ketua, so the chair can inspect the nota before approving the expense.
+
+Files are written under `UPLOAD_DIR/receipts` (already git-ignored) and served
+through the same `/api` prefix, so no extra reverse-proxy rule is required.
+Uploaded paths are stored on the ledger row in `KasEntry.receipt_image_path`.
 
 ## Getting started with a new komunitas
 

@@ -10,7 +10,17 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine, get_db
 from app.models.models import Komunitas, User
-from app.routers import auth, iuran_types, kas, komunitas, public, reports, tagihan, warga
+from app.routers import (
+    auth,
+    iuran_types,
+    kas,
+    komunitas,
+    public,
+    reports,
+    tagihan,
+    uploads,
+    warga,
+)
 from app.seed import seed_data
 
 logger = logging.getLogger(__name__)
@@ -117,6 +127,7 @@ app.include_router(tagihan.router)
 app.include_router(kas.router)
 app.include_router(reports.router)
 app.include_router(public.router)
+app.include_router(uploads.router)
 
 
 @app.get("/api/health")

@@ -128,6 +128,39 @@ export async function downloadFile(
   window.URL.revokeObjectURL(blobUrl);
 }
 
+/** Uploads a receipt image and returns the stored path to attach to an expense. */
+export async function uploadReceipt(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const resp = await api.post<{ receipt_image_path: string }>("/api/uploads/receipt", form);
+  return resp.data.receipt_image_path;
+}
+
+/**
+ * Fetches an authenticated image and returns an object URL for display.
+ * The receipt endpoint requires an Authorization header, which a plain
+ * `<img src>` cannot send, so it must be fetched as a blob first.
+ * Callers must revoke the returned URL when it is no longer needed.
+ */
+export async function fetchImageObjectUrl(path: string): Promise<string> {
+  const token = localStorage.getItem("kas_token");
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (response.status === 401) {
+    clearSession();
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+    throw new Error("Sesi telah berakhir, silakan login kembali.");
+  }
+  if (!response.ok) {
+    throw new Error(`Gagal memuat gambar (${response.status})`);
+  }
+  const blob = await response.blob();
+  return window.URL.createObjectURL(blob);
+}
+
 /** Extracts a FastAPI-style `{ detail }` error message, falling back to a default. */
 export function errorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
