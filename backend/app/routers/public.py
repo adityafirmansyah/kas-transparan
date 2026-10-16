@@ -9,9 +9,11 @@ privacy we deliberately:
     category bucket)
 """
 
+from calendar import monthrange
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -59,36 +61,90 @@ def public_summary(
     if not komunitas:
         raise HTTPException(status_code=404, detail="Komunitas tidak ditemukan")
 
-    periode = periode or date.today().strftime("%Y-%m")
+    target_periode = periode or date.today().strftime("%Y-%m")
+    try:
+        parts = target_periode.split("-")
+        yr, mo = int(parts[0]), int(parts[1])
+        start_m = date(yr, mo, 1)
+        end_m = date(yr, mo, monthrange(yr, mo)[1])
+    except Exception:
+        today = date.today()
+        start_m = date(today.year, today.month, 1)
+        end_m = date(today.year, today.month, monthrange(today.year, today.month)[1])
 
-    entries = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas.id).all()
+    # 1. Total Saldo Kumulatif
+    saldo_expr = func.coalesce(
+        func.sum(
+            case(
+                (KasEntry.tipe == "pemasukan", KasEntry.nominal),
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved),
+                    -KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
 
-    saldo_akhir = 0.0
-    total_masuk_bulan_ini = 0.0
-    total_keluar_bulan_ini = 0.0
-    pengeluaran_per_kategori: dict[str, float] = {}
+    # 2. Pemasukan Bulan Ini
+    masuk_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pemasukan")
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
 
-    for e in entries:
-        bulan = e.tanggal.strftime("%Y-%m")
-        if e.tipe == "pemasukan":
-            saldo_akhir += e.nominal
-            if bulan == periode:
-                total_masuk_bulan_ini += e.nominal
-        elif e.tipe == "pengeluaran" and e.approval_status == PengeluaranStatus.approved:
-            saldo_akhir -= e.nominal
-            if bulan == periode:
-                total_keluar_bulan_ini += e.nominal
-                pengeluaran_per_kategori[e.kategori] = (
-                    pengeluaran_per_kategori.get(e.kategori, 0.0) + e.nominal
-                )
+    # 3. Pengeluaran Bulan Ini
+    keluar_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved)
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
+
+    base_query = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas.id)
+    totals = base_query.with_entities(saldo_expr, masuk_expr, keluar_expr).one()
+
+    # 4. Pengeluaran per Kategori di Bulan Ini
+    cat_rows = (
+        base_query.filter(
+            KasEntry.tipe == "pengeluaran",
+            KasEntry.approval_status == PengeluaranStatus.approved,
+            KasEntry.tanggal >= start_m,
+            KasEntry.tanggal <= end_m,
+        )
+        .with_entities(KasEntry.kategori, func.sum(KasEntry.nominal))
+        .group_by(KasEntry.kategori)
+        .all()
+    )
+    pengeluaran_per_kategori = {cat: float(nom) for cat, nom in cat_rows}
 
     return PublicSummary(
         komunitas_nama=komunitas.nama,
-        saldo_akhir=saldo_akhir,
-        total_masuk_bulan_ini=total_masuk_bulan_ini,
-        total_keluar_bulan_ini=total_keluar_bulan_ini,
+        saldo_akhir=float(totals[0]),
+        total_masuk_bulan_ini=float(totals[1]),
+        total_keluar_bulan_ini=float(totals[2]),
         pengeluaran_per_kategori=pengeluaran_per_kategori,
-        periode=periode,
+        periode=target_periode,
     )
 
 
