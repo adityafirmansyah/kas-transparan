@@ -65,6 +65,8 @@ export default function KasTab(): ReactElement {
   const isAdmin = role === "admin";
   const [entries, setEntries] = useState<KasEntry[]>([]);
   const [saldo, setSaldo] = useState(0);
+  const [totalMasukBulanIni, setTotalMasukBulanIni] = useState(0);
+  const [totalKeluarBulanIni, setTotalKeluarBulanIni] = useState(0);
   const [pemasukanForm, setPemasukanForm] = useState<PemasukanFormState>(EMPTY_PEMASUKAN);
   const [pengeluaranForm, setPengeluaranForm] = useState<PengeluaranFormState>(EMPTY_PENGELUARAN);
   const [error, setError] = useState("");
@@ -101,6 +103,8 @@ export default function KasTab(): ReactElement {
       .then(([entriesResp, saldoResp]) => {
         setEntries(entriesResp.data);
         setSaldo(saldoResp.data.saldo);
+        setTotalMasukBulanIni(saldoResp.data.total_masuk_bulan_ini ?? 0);
+        setTotalKeluarBulanIni(saldoResp.data.total_keluar_bulan_ini ?? 0);
       })
       .catch(() => setError("Gagal memuat catatan kas"))
       .finally(() => setLoading(false));
@@ -213,29 +217,71 @@ export default function KasTab(): ReactElement {
 
   return (
     <div className="space-y-6">
-      {/* Saldo Hero Strip */}
-      <div className="bg-gradient-to-r from-emerald-800 to-emerald-950 rounded-2xl p-5 sm:p-6 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-700/50 rounded-xl border border-emerald-500/30">
-            <Wallet className="w-7 h-7 text-emerald-200" />
-          </div>
-          <div>
-            <span className="text-xs uppercase tracking-wider text-emerald-300 font-semibold block">
-              {isAdmin ? "Saldo Kas yang Anda Kelola" : "Saldo Kas Riil Saat Ini"}
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-0.5">
-              {formatRupiah(saldo)}
+      {/* Saldo & Current Month Metrics Strip */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Saldo Utama */}
+        <div className="bg-gradient-to-r from-emerald-800 to-emerald-950 rounded-2xl p-5 text-white shadow-md flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-3 bg-emerald-700/50 rounded-xl border border-emerald-500/30 shrink-0">
+              <Wallet className="w-6 h-6 text-emerald-200" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] uppercase tracking-wider text-emerald-300 font-semibold block truncate">
+                {isAdmin ? "Saldo yang Anda Kelola" : "Saldo Kas Riil Saat Ini"}
+              </span>
+              <div className="text-xl sm:text-2xl font-extrabold font-mono text-white mt-0.5 truncate">
+                {formatRupiah(saldo)}
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
           {pendingCount > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-semibold">
+            <div
+              className="p-2 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-semibold shrink-0"
+              title={`${pendingCount} pengeluaran menunggu approval`}
+            >
               <Clock className="w-4 h-4 text-amber-300" />
-              <span>{pendingCount} Pengeluaran Menunggu Approval</span>
             </div>
           )}
+        </div>
+
+        {/* Card 2: Pemasukan Bulan Ini */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl shrink-0">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block truncate">
+                Pemasukan Bulan Ini
+              </span>
+              <div className="text-xl sm:text-2xl font-extrabold font-mono text-emerald-700 mt-0.5 truncate">
+                +{formatRupiah(totalMasukBulanIni)}
+              </div>
+            </div>
+          </div>
+          <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+            Masuk
+          </span>
+        </div>
+
+        {/* Card 3: Pengeluaran Bulan Ini */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-3 bg-rose-50 text-rose-700 rounded-xl shrink-0">
+              <TrendingDown className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block truncate">
+                Pengeluaran Bulan Ini
+              </span>
+              <div className="text-xl sm:text-2xl font-extrabold font-mono text-rose-600 mt-0.5 truncate">
+                -{formatRupiah(totalKeluarBulanIni)}
+              </div>
+            </div>
+          </div>
+          <span className="text-[11px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 shrink-0">
+            Keluar
+          </span>
         </div>
       </div>
 
