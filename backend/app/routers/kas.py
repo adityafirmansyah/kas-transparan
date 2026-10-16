@@ -8,6 +8,8 @@
 - Saldo = sum(pemasukan.nominal) - sum(pengeluaran.nominal where approved).
 """
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -19,24 +21,48 @@ from app.schemas.schemas import ApprovalRequest, KasEntryOut, PemasukanCreate, P
 router = APIRouter(prefix="/api/kas", tags=["kas"])
 
 
-def compute_saldo(db: Session, komunitas_id: str, user: User | None = None) -> float:
-    """Computes running cash balance.
+def compute_saldo_summary(
+    db: Session, komunitas_id: str, user: User | None = None
+) -> dict:
+    """Computes total running cash balance and current-month breakdown.
 
-    When `user` is an admin, the balance is scoped to only the entries
-    visible to that admin (their own PIC-owned tagihan entries + their own
-    manually created entries) — consistent with the scoped ledger list.
-    Ketua (or no user passed) gets the full community-wide balance.
+    Returns:
+        dict with keys:
+          - saldo: running net cash balance
+          - total_masuk_bulan_ini: total income in current month (YYYY-MM)
+          - total_keluar_bulan_ini: total approved expenses in current month
+          - periode: current month string (e.g. '2026-10')
     """
     entries = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas_id).all()
     if user is not None:
         entries = filter_kas_entries_by_pic(db, entries, user)
+
+    current_month_str = datetime.utcnow().strftime("%Y-%m")
     total = 0.0
+    masuk_bulan_ini = 0.0
+    keluar_bulan_ini = 0.0
+
     for e in entries:
+        tgl_str = e.tanggal.strftime("%Y-%m") if e.tanggal else ""
         if e.tipe == "pemasukan":
             total += e.nominal
+            if tgl_str == current_month_str:
+                masuk_bulan_ini += e.nominal
         elif e.tipe == "pengeluaran" and e.approval_status == PengeluaranStatus.approved:
             total -= e.nominal
-    return total
+            if tgl_str == current_month_str:
+                keluar_bulan_ini += e.nominal
+
+    return {
+        "saldo": total,
+        "total_masuk_bulan_ini": masuk_bulan_ini,
+        "total_keluar_bulan_ini": keluar_bulan_ini,
+        "periode": current_month_str,
+    }
+
+
+def compute_saldo(db: Session, komunitas_id: str, user: User | None = None) -> float:
+    return compute_saldo_summary(db, komunitas_id, user=user)["saldo"]
 
 
 @router.post("/pemasukan", response_model=KasEntryOut, status_code=201)
@@ -168,4 +194,4 @@ def get_saldo(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    return {"saldo": compute_saldo(db, user.komunitas_id, user=user)}
+    return compute_saldo_summary(db, user.komunitas_id, user=user)

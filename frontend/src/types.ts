@@ -163,6 +163,9 @@ export interface PublicSummary {
 /** Shape returned by GET /api/kas/saldo. */
 export interface SaldoResponse {
   saldo: number;
+  total_masuk_bulan_ini?: number;
+  total_keluar_bulan_ini?: number;
+  periode?: string;
 }
 
 /** One unpaid period+iuran line item within a multi-month arrears breakdown. */
