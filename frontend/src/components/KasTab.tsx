@@ -21,6 +21,7 @@ import {
 import { api, downloadFile, errorMessage, formatRupiah, getSession, uploadReceipt } from "../api";
 import type { ApprovalStatus, KasEntry, SaldoResponse } from "../types";
 import ReceiptViewer from "./ReceiptViewer";
+import Pagination from "./Pagination";
 
 interface PemasukanFormState {
   kategori: string;
@@ -73,6 +74,8 @@ export default function KasTab(): ReactElement {
   const [filter, setFilter] = useState<KasFilter>("semua");
   const [approvalActionId, setApprovalActionId] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [viewingReceipt, setViewingReceipt] = useState<{ path: string; title: string } | null>(
     null
   );
@@ -196,6 +199,13 @@ export default function KasTab(): ReactElement {
     if (filter === "pending") return e.tipe === "pengeluaran" && e.approval_status === "pending";
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedEntries = filteredEntries.slice(
+    (validCurrentPage - 1) * pageSize,
+    validCurrentPage * pageSize
+  );
 
   const pendingCount = entries.filter(
     (e) => e.tipe === "pengeluaran" && e.approval_status === "pending"
@@ -514,7 +524,10 @@ export default function KasTab(): ReactElement {
           <div className="flex items-center gap-1.5">
             <Filter className="w-4 h-4 text-slate-400 ml-2 mr-1" />
             <button
-              onClick={() => setFilter("semua")}
+              onClick={() => {
+                setFilter("semua");
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 filter === "semua" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
               }`}
@@ -522,7 +535,10 @@ export default function KasTab(): ReactElement {
               Semua ({entries.length})
             </button>
             <button
-              onClick={() => setFilter("pemasukan")}
+              onClick={() => {
+                setFilter("pemasukan");
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 filter === "pemasukan"
                   ? "bg-emerald-700 text-white"
@@ -532,7 +548,10 @@ export default function KasTab(): ReactElement {
               Pemasukan
             </button>
             <button
-              onClick={() => setFilter("pengeluaran")}
+              onClick={() => {
+                setFilter("pengeluaran");
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 filter === "pengeluaran"
                   ? "bg-rose-700 text-white"
@@ -542,7 +561,10 @@ export default function KasTab(): ReactElement {
               Pengeluaran
             </button>
             <button
-              onClick={() => setFilter("pending")}
+              onClick={() => {
+                setFilter("pending");
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 filter === "pending"
                   ? "bg-amber-600 text-white"
@@ -632,7 +654,7 @@ export default function KasTab(): ReactElement {
                     </td>
                   </tr>
                 ) : (
-                  filteredEntries.map((e) => (
+                  paginatedEntries.map((e) => (
                     <tr key={e.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4 text-xs font-mono text-slate-600">{e.tanggal}</td>
                       <td className="py-3.5 px-4">
@@ -757,9 +779,23 @@ export default function KasTab(): ReactElement {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={validCurrentPage}
+            totalPages={totalPages}
+            totalItems={filteredEntries.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[15, 30, 50, 100]}
+            itemLabel="transaksi"
+          />
         </div>
 
-        {/* Card List (mobile) */}
+        {/* Mobile card list */}
         <div className="block md:hidden space-y-3">
           {loading ? (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-10 text-center text-slate-500">
@@ -770,12 +806,12 @@ export default function KasTab(): ReactElement {
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-12 text-center text-slate-500">
               <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="font-semibold text-slate-700">Belum ada transaksi</p>
-              <p className="text-xs text-slate-400 mt-1 px-4">
+              <p className="text-xs text-slate-400 mt-1">
                 Catat pemasukan atau pengeluaran kas melalui formulir di atas
               </p>
             </div>
           ) : (
-            filteredEntries.map((e) => (
+            paginatedEntries.map((e) => (
               <div
                 key={e.id}
                 className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3"
@@ -896,6 +932,22 @@ export default function KasTab(): ReactElement {
               </div>
             ))
           )}
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <Pagination
+              currentPage={validCurrentPage}
+              totalPages={totalPages}
+              totalItems={filteredEntries.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              pageSizeOptions={[15, 30, 50, 100]}
+              itemLabel="transaksi"
+            />
+          </div>
         </div>
       </div>
 

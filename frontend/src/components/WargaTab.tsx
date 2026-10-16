@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "../api";
 import type { Warga, WargaCreate, WargaUpdate } from "../types";
+import Pagination from "./Pagination";
 
 interface WargaFormState {
   nama: string;
@@ -42,6 +43,8 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
   const [editingWarga, setEditingWarga] = useState<Warga | null>(null);
   const [editForm, setEditForm] = useState<WargaFormState>(EMPTY_FORM);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   function load(): void {
     setLoading(true);
@@ -149,6 +152,13 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
     );
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredWarga.length / pageSize));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedWarga = filteredWarga.slice(
+    (validCurrentPage - 1) * pageSize,
+    validCurrentPage * pageSize
+  );
+
   const totalAktif = warga.filter((w) => w.aktif).length;
 
   return (
@@ -199,7 +209,10 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
             type="text"
             placeholder="Cari nama, no. rumah, atau HP..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
           />
         </div>
@@ -243,7 +256,7 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
                   </td>
                 </tr>
               ) : (
-                filteredWarga.map((w) => (
+                paginatedWarga.map((w) => (
                   <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900">
                       <div className="flex items-center gap-2">
@@ -333,6 +346,19 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={validCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredWarga.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="warga"
+        />
       </div>
 
       {/* Card List Section (mobile) */}
@@ -353,7 +379,7 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
             </p>
           </div>
         ) : (
-          filteredWarga.map((w) => (
+          paginatedWarga.map((w) => (
             <div
               key={w.id}
               className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3"
@@ -428,6 +454,21 @@ export default function WargaTab({ onNavigateToTagihanFuture }: WargaTabProps): 
             </div>
           ))
         )}
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <Pagination
+            currentPage={validCurrentPage}
+            totalPages={totalPages}
+            totalItems={filteredWarga.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            itemLabel="warga"
+          />
+        </div>
       </div>
 
       {/* Add Warga Modal */}

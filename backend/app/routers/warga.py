@@ -1,6 +1,6 @@
 """Warga (resident) CRUD, scoped to the authenticated admin's komunitas."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -26,12 +26,19 @@ def create_warga(
 
 @router.get("", response_model=list[WargaOut])
 def list_warga(
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    return (
-        db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id).order_by(Warga.nama).all()
+    query = (
+        db.query(Warga).filter(Warga.komunitas_id == user.komunitas_id).order_by(Warga.nama.asc())
     )
+    if offset > 0:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
 @router.get("/{warga_id}", response_model=WargaOut)

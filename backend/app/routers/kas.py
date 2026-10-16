@@ -8,7 +8,7 @@
 - Saldo = sum(pemasukan.nominal) - sum(pengeluaran.nominal where approved).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -114,6 +114,8 @@ def approve_or_reject_pengeluaran(
 @router.get("", response_model=list[KasEntryOut])
 def list_kas_entries(
     tipe: str | None = None,
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
@@ -121,7 +123,12 @@ def list_kas_entries(
     if tipe:
         query = query.filter(KasEntry.tipe == tipe)
     entries = query.order_by(KasEntry.tanggal.desc()).all()
-    return filter_kas_entries_by_pic(db, entries, user)
+    filtered = filter_kas_entries_by_pic(db, entries, user)
+    if offset > 0:
+        filtered = filtered[offset:]
+    if limit is not None:
+        filtered = filtered[:limit]
+    return filtered
 
 
 def filter_kas_entries_by_pic(db: Session, entries: list[KasEntry], user: User) -> list[KasEntry]:

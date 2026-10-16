@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for kas-transparan.
+"""SQLAlchemy ORM models for kas-transparan with comprehensive indexes.
 
 Multi-tenancy: everything hangs off Komunitas (an RT/RW/warga community).
 Each row of warga/iuran/tagihan/kas belongs to exactly one komunitas_id.
@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     String,
     Table,
     UniqueConstraint,
@@ -71,7 +72,7 @@ class Komunitas(Base):
 
     id = Column(String, primary_key=True, default=gen_uuid)
     nama = Column(String, nullable=False)  # e.g. "RT 05 / RW 03 Sukamaju"
-    slug = Column(String, unique=True, nullable=False)  # used in public transparency URL
+    slug = Column(String, unique=True, nullable=False, index=True)
     alamat = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -89,8 +90,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
-    username = Column(String, nullable=False)
+    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False, index=True)
+    username = Column(String, nullable=False, index=True)
     nama = Column(String, nullable=True)  # display name, e.g. "Budi Santoso"
     hashed_password = Column(String, nullable=False)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.admin)
@@ -109,18 +110,23 @@ class Warga(Base):
     __tablename__ = "warga"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
-    nama = Column(String, nullable=False)
-    no_hp = Column(String, nullable=True)
+    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False, index=True)
+    nama = Column(String, nullable=False, index=True)
+    no_hp = Column(String, nullable=True, index=True)
     alamat = Column(String, nullable=True)
     no_rumah = Column(String, nullable=True)
-    aktif = Column(Boolean, default=True)
+    aktif = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     komunitas = relationship("Komunitas", back_populates="warga")
     tagihan = relationship("Tagihan", back_populates="warga", cascade="all, delete-orphan")
     targeted_by_iuran_types = relationship(
         "IuranType", secondary=iuran_type_warga, back_populates="target_warga"
+    )
+
+    __table_args__ = (
+        Index("ix_warga_komunitas_aktif", "komunitas_id", "aktif"),
+        Index("ix_warga_komunitas_no_hp", "komunitas_id", "no_hp"),
     )
 
 
@@ -130,12 +136,12 @@ class IuranType(Base):
     __tablename__ = "iuran_types"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
+    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False, index=True)
     nama = Column(String, nullable=False)
     nominal = Column(Float, nullable=False)
     period_type = Column(SAEnum(PeriodType), nullable=False, default=PeriodType.monthly)
-    aktif = Column(Boolean, default=True)
-    admin_id = Column(String, ForeignKey("users.id"), nullable=True)
+    aktif = Column(Boolean, default=True, index=True)
+    admin_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     komunitas = relationship("Komunitas", back_populates="iuran_types")
@@ -152,12 +158,14 @@ class Tagihan(Base):
     __tablename__ = "tagihan"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
-    warga_id = Column(String, ForeignKey("warga.id"), nullable=False)
-    iuran_type_id = Column(String, ForeignKey("iuran_types.id"), nullable=False)
-    periode = Column(String, nullable=False)  # "YYYY-MM" for monthly, or free text for one_time
+    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False, index=True)
+    warga_id = Column(String, ForeignKey("warga.id"), nullable=False, index=True)
+    iuran_type_id = Column(String, ForeignKey("iuran_types.id"), nullable=False, index=True)
+    periode = Column(String, nullable=False, index=True)
     nominal = Column(Float, nullable=False)
-    status = Column(SAEnum(TagihanStatus), nullable=False, default=TagihanStatus.belum_bayar)
+    status = Column(
+        SAEnum(TagihanStatus), nullable=False, default=TagihanStatus.belum_bayar, index=True
+    )
     payment_method = Column(SAEnum(PaymentMethod), nullable=True)
     paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -169,6 +177,10 @@ class Tagihan(Base):
         UniqueConstraint(
             "warga_id", "iuran_type_id", "periode", name="uq_tagihan_warga_iuran_periode"
         ),
+        Index("ix_tagihan_komunitas_periode", "komunitas_id", "periode"),
+        Index("ix_tagihan_komunitas_status", "komunitas_id", "status"),
+        Index("ix_tagihan_komunitas_warga_status", "komunitas_id", "warga_id", "status"),
+        Index("ix_tagihan_komunitas_iuran_periode", "komunitas_id", "iuran_type_id", "periode"),
     )
 
 
@@ -178,21 +190,28 @@ class KasEntry(Base):
     __tablename__ = "kas_entries"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False)
-    tipe = Column(String, nullable=False)  # "pemasukan" | "pengeluaran"
+    komunitas_id = Column(String, ForeignKey("komunitas.id"), nullable=False, index=True)
+    tipe = Column(String, nullable=False, index=True)  # "pemasukan" | "pengeluaran"
     kategori = Column(
-        String, nullable=False
+        String, nullable=False, index=True
     )  # e.g. "iuran", "donasi", "kebersihan", "keamanan", "lainnya"
     deskripsi = Column(String, nullable=False)
     nominal = Column(Float, nullable=False)
-    tanggal = Column(Date, nullable=False, default=date.today)
+    tanggal = Column(Date, nullable=False, default=date.today, index=True)
     receipt_image_path = Column(String, nullable=True)
     tagihan_id = Column(
-        String, ForeignKey("tagihan.id"), nullable=True
+        String, ForeignKey("tagihan.id"), nullable=True, index=True
     )  # link if auto-generated from payment
-    approval_status = Column(SAEnum(PengeluaranStatus), nullable=True)  # only set for pengeluaran
-    created_by = Column(String, ForeignKey("users.id"), nullable=True)
-    approved_by = Column(String, ForeignKey("users.id"), nullable=True)
+    approval_status = Column(
+        SAEnum(PengeluaranStatus), nullable=True, index=True
+    )  # only set for pengeluaran
+    created_by = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    approved_by = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     komunitas = relationship("Komunitas", back_populates="kas_entries")
+
+    __table_args__ = (
+        Index("ix_kas_komunitas_tanggal", "komunitas_id", "tanggal"),
+        Index("ix_kas_komunitas_tipe_approval", "komunitas_id", "tipe", "approval_status"),
+    )

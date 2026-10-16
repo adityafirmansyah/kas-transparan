@@ -30,6 +30,8 @@ Base.metadata.create_all(bind=engine)
 
 def _ensure_sqlite_migrations():
     """Lightweight migration to add admin_id to iuran_types if missing (SQLite)."""
+    if engine.dialect.name != "sqlite":
+        return
     try:
         with engine.connect() as conn:
             # Check existing columns in iuran_types
