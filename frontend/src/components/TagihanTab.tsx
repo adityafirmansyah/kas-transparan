@@ -18,8 +18,10 @@ import {
   FastForward,
   Download,
   FileSpreadsheet,
+  Trash2,
 } from "lucide-react";
 import { api, downloadFile, errorMessage, formatRupiah, getSession } from "../api";
+import Pagination from "./Pagination";
 import type {
   FuturePaymentItem,
   IuranType,
@@ -132,6 +134,14 @@ export default function TagihanTab({
 
   // Export states (Admin only)
   const [exportingTagihan, setExportingTagihan] = useState<"csv" | "xlsx" | null>(null);
+
+  // Delete Tagihan confirmation state
+  const [deletingTagihanId, setDeletingTagihanId] = useState<string | null>(null);
+  const [deletingLoading, setDeletingLoading] = useState(false);
+
+  // Pagination state for Tagihan
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   async function handleExportTagihan(format: "csv" | "xlsx"): Promise<void> {
     setExportingTagihan(format);
@@ -264,9 +274,27 @@ export default function TagihanTab({
       loadTagihan();
       if (viewMode === "multi") loadTunggakanMulti();
     } catch (err) {
-      setError(errorMessage(err, "Gagal mencatat pembayaran"));
+      setError(errorMessage(err, "Gagal memproses pembayaran"));
     } finally {
       setPayingLoading(false);
+    }
+  }
+
+  async function handleDeleteTagihan(id: string): Promise<void> {
+    setDeletingLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.delete(`/api/tagihan/${id}`);
+      setDeletingTagihanId(null);
+      setSelectedTagihanIds((prev) => prev.filter((tid) => tid !== id));
+      setMessage("Tagihan berhasil dihapus.");
+      loadTagihan();
+      if (viewMode === "multi") loadTunggakanMulti();
+    } catch (err) {
+      setError(errorMessage(err, "Gagal menghapus tagihan"));
+    } finally {
+      setDeletingLoading(false);
     }
   }
 
@@ -373,7 +401,14 @@ export default function TagihanTab({
     return true;
   });
 
-  const groupedTagihan = groupTagihanByWarga(filteredTagihan);
+  const totalPages = Math.max(1, Math.ceil(filteredTagihan.length / pageSize));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedTagihan = filteredTagihan.slice(
+    (validCurrentPage - 1) * pageSize,
+    validCurrentPage * pageSize
+  );
+
+  const groupedTagihan = groupTagihanByWarga(paginatedTagihan);
 
   const totalTagihan = tagihanList.length;
   const totalLunas = tagihanList.filter((t) => t.status === "lunas").length;
@@ -588,30 +623,39 @@ export default function TagihanTab({
             <div className="flex items-center gap-1.5 flex-wrap">
               <Filter className="w-4 h-4 text-slate-400 ml-2 mr-1" />
               <button
-                onClick={() => setFilterStatus("semua")}
+                onClick={() => {
+                  setFilterStatus("semua");
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   filterStatus === "semua"
-                    ? "bg-slate-900 text-white"
+                    ? "bg-slate-900 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                Semua ({totalTagihan})
+                Semua ({tagihanList.length})
               </button>
               <button
-                onClick={() => setFilterStatus("lunas")}
+                onClick={() => {
+                  setFilterStatus("lunas");
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   filterStatus === "lunas"
-                    ? "bg-emerald-700 text-white"
+                    ? "bg-emerald-700 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
                 Lunas ({totalLunas})
               </button>
               <button
-                onClick={() => setFilterStatus("belum_bayar")}
+                onClick={() => {
+                  setFilterStatus("belum_bayar");
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   filterStatus === "belum_bayar"
-                    ? "bg-rose-700 text-white"
+                    ? "bg-rose-700 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -835,6 +879,14 @@ export default function TagihanTab({
                                     <FastForward className="w-3 h-3 text-emerald-700" />
                                     <span>Dimuka</span>
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingTagihanId(t.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                    title="Hapus tagihan (belum bayar)"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               ) : (
                                 <div className="flex items-center justify-end gap-1.5">
@@ -867,6 +919,20 @@ export default function TagihanTab({
                 </tbody>
               </table>
             </div>
+
+            <Pagination
+              currentPage={validCurrentPage}
+              totalPages={totalPages}
+              totalItems={filteredTagihan.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              pageSizeOptions={[15, 30, 50, 100]}
+              itemLabel="tagihan"
+            />
           </div>
 
           {/* Tagihan Cards (mobile) — grouped per warga: one card, multiple iuran line-items */}
@@ -959,6 +1025,14 @@ export default function TagihanTab({
                                 >
                                   <FastForward className="w-3 h-3 text-emerald-700" />
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingTagihanId(t.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                  title="Hapus tagihan (belum bayar)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             ) : (
                               <div className="flex items-center gap-1.5">
@@ -986,6 +1060,22 @@ export default function TagihanTab({
                 </div>
               ))
             )}
+
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+              <Pagination
+                currentPage={validCurrentPage}
+                totalPages={totalPages}
+                totalItems={filteredTagihan.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setCurrentPage(1);
+                }}
+                pageSizeOptions={[15, 30, 50, 100]}
+                itemLabel="tagihan"
+              />
+            </div>
           </div>
         </>
       )}
@@ -1298,6 +1388,47 @@ export default function TagihanTab({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Tagihan Confirmation Modal */}
+      {deletingTagihanId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Hapus Tagihan?</h3>
+                <p className="text-xs text-slate-500">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Tagihan belum bayar ini akan dihapus permanen dari daftar penagihan warga.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingTagihanId(null)}
+                disabled={deletingLoading}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteTagihan(deletingTagihanId)}
+                disabled={deletingLoading}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deletingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Ya, Hapus</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

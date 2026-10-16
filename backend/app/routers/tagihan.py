@@ -172,6 +172,42 @@ def list_tagihan(
     return results
 
 
+@router.delete("/{tagihan_id}", status_code=204)
+def delete_tagihan(
+    tagihan_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin")),
+):
+    """Deletes an unpaid tagihan (belum_bayar).
+
+    Paid tagihan (lunas) CANNOT be deleted directly because it is linked to
+    accounting entries (kas_entries) in the transparency ledger.
+    """
+    tagihan = (
+        db.query(Tagihan)
+        .filter(Tagihan.id == tagihan_id, Tagihan.komunitas_id == user.komunitas_id)
+        .first()
+    )
+    if not tagihan:
+        raise HTTPException(status_code=404, detail="Tagihan tidak ditemukan")
+
+    if tagihan.iuran_type.admin_id and tagihan.iuran_type.admin_id != user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Hanya admin penanggung jawab yang dapat menghapus tagihan iuran ini",
+        )
+
+    if tagihan.status == TagihanStatus.lunas:
+        raise HTTPException(
+            status_code=400,
+            detail="Tagihan yang sudah lunas tidak dapat dihapus demi integritas pembukuan kas",
+        )
+
+    db.delete(tagihan)
+    db.commit()
+    return None
+
+
 @router.post("/{tagihan_id}/pay", response_model=TagihanOut)
 def pay_tagihan(
     tagihan_id: str,
