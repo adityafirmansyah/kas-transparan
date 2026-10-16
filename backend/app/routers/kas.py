@@ -21,9 +21,7 @@ from app.schemas.schemas import ApprovalRequest, KasEntryOut, PemasukanCreate, P
 router = APIRouter(prefix="/api/kas", tags=["kas"])
 
 
-def compute_saldo_summary(
-    db: Session, komunitas_id: str, user: User | None = None
-) -> dict:
+def compute_saldo_summary(db: Session, komunitas_id: str, user: User | None = None) -> dict:
     """Computes total running cash balance and current-month breakdown.
 
     Returns:
