@@ -14,7 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { clearSession, getSession, api, formatRupiah } from "../api";
-import type { KasEntry, Komunitas, SaldoResponse, TagihanWithWarga, Warga } from "../types";
+import type { Komunitas, SaldoResponse, TagihanWithWarga, Warga } from "../types";
 import WargaTab from "../components/WargaTab";
 import IuranTab from "../components/IuranTab";
 import TagihanTab from "../components/TagihanTab";
@@ -81,12 +81,9 @@ export default function DashboardPage(): ReactElement {
       .catch(() => {});
 
     api
-      .get<KasEntry[]>("/api/kas")
+      .get<{ pending_count: number }>("/api/kas/pending-count")
       .then((r) => {
-        const pending = r.data.filter(
-          (e) => e.tipe === "pengeluaran" && e.approval_status === "pending"
-        ).length;
-        setPendingApprovals(pending);
+        setPendingApprovals(r.data.pending_count);
       })
       .catch(() => {});
   }, [komunitasId]);

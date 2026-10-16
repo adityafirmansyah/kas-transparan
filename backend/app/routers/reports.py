@@ -2,8 +2,11 @@
 
 import csv
 import io
+from calendar import monthrange
+from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,7 +21,7 @@ from app.models.models import (
     TagihanStatus,
     User,
 )
-from app.routers.kas import filter_kas_entries_by_pic
+from app.routers.kas import filter_kas_entries_by_pic, get_pic_scoped_kas_query
 from app.schemas.schemas import (
     MonthlyReport,
     TunggakanMultiOut,
@@ -35,31 +38,70 @@ def monthly_report(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    entries = (
-        db.query(KasEntry)
-        .filter(
-            KasEntry.komunitas_id == user.komunitas_id,
-        )
-        .all()
+    try:
+        parts = periode.split("-")
+        yr, mo = int(parts[0]), int(parts[1])
+        start_m = date(yr, mo, 1)
+        end_m = date(yr, mo, monthrange(yr, mo)[1])
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Format periode harus YYYY-MM") from exc
+
+    base_query = get_pic_scoped_kas_query(db, user.komunitas_id, user)
+
+    # 1. Saldo Awal: total neto sebelum bulan ini
+    saldo_awal_expr = func.coalesce(
+        func.sum(
+            case(
+                ((KasEntry.tipe == "pemasukan") & (KasEntry.tanggal < start_m), KasEntry.nominal),
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved)
+                    & (KasEntry.tanggal < start_m),
+                    -KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
     )
-    entries = filter_kas_entries_by_pic(db, entries, user)
 
-    total_masuk = 0.0
-    total_keluar = 0.0
-    saldo_awal = 0.0
-    for e in entries:
-        bulan = e.tanggal.strftime("%Y-%m")
-        if e.tipe == "pemasukan":
-            if bulan == periode:
-                total_masuk += e.nominal
-            elif bulan < periode:
-                saldo_awal += e.nominal
-        elif e.tipe == "pengeluaran" and e.approval_status == PengeluaranStatus.approved:
-            if bulan == periode:
-                total_keluar += e.nominal
-            elif bulan < periode:
-                saldo_awal -= e.nominal
+    # 2. Total Masuk Bulan Ini
+    masuk_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pemasukan")
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
 
+    # 3. Total Keluar Bulan Ini
+    keluar_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved)
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
+
+    row = base_query.with_entities(saldo_awal_expr, masuk_expr, keluar_expr).one()
+    saldo_awal = float(row[0])
+    total_masuk = float(row[1])
+    total_keluar = float(row[2])
     saldo_akhir = saldo_awal + total_masuk - total_keluar
 
     return MonthlyReport(

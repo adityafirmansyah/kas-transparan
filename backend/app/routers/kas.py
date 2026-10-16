@@ -8,9 +8,12 @@
 - Saldo = sum(pemasukan.nominal) - sum(pengeluaran.nominal where approved).
 """
 
-from datetime import datetime
+from calendar import monthrange
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case, func, or_
+from sqlalchemy.orm import Query as SAQuery
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,8 +24,33 @@ from app.schemas.schemas import ApprovalRequest, KasEntryOut, PemasukanCreate, P
 router = APIRouter(prefix="/api/kas", tags=["kas"])
 
 
+def get_pic_scoped_kas_query(db: Session, komunitas_id: str, user: User | None = None) -> SAQuery:
+    """Builds a base SQLAlchemy Query for KasEntry scoped by PIC ownership.
+
+    - Entries linked to a tagihan are visible if the user is the assigned
+      admin of that iuran_type (or if the iuran_type has no PIC assigned).
+    - Unlinked/manual entries (e.g. general expense or donation) are visible
+      if created by the current admin user.
+    - Ketua and unauthenticated requests (public) see all entries in the komunitas.
+    """
+    query = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas_id)
+    if user is not None and getattr(user, "role", None) and user.role.value == "admin":
+        query = (
+            query.outerjoin(Tagihan, KasEntry.tagihan_id == Tagihan.id)
+            .outerjoin(IuranType, Tagihan.iuran_type_id == IuranType.id)
+            .filter(
+                or_(
+                    KasEntry.tagihan_id.is_(None) & (KasEntry.created_by == user.id),
+                    KasEntry.tagihan_id.isnot(None)
+                    & or_(IuranType.admin_id.is_(None), IuranType.admin_id == user.id),
+                )
+            )
+        )
+    return query
+
+
 def compute_saldo_summary(db: Session, komunitas_id: str, user: User | None = None) -> dict:
-    """Computes total running cash balance and current-month breakdown.
+    """Computes total running cash balance and current-month breakdown using fast SQL aggregation.
 
     Returns:
         dict with keys:
@@ -31,31 +59,64 @@ def compute_saldo_summary(db: Session, komunitas_id: str, user: User | None = No
           - total_keluar_bulan_ini: total approved expenses in current month
           - periode: current month string (e.g. '2026-10')
     """
-    entries = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas_id).all()
-    if user is not None:
-        entries = filter_kas_entries_by_pic(db, entries, user)
+    today = date.today()
+    start_m = date(today.year, today.month, 1)
+    end_m = date(today.year, today.month, monthrange(today.year, today.month)[1])
 
-    current_month_str = datetime.utcnow().strftime("%Y-%m")
-    total = 0.0
-    masuk_bulan_ini = 0.0
-    keluar_bulan_ini = 0.0
+    base_query = get_pic_scoped_kas_query(db, komunitas_id, user)
 
-    for e in entries:
-        tgl_str = e.tanggal.strftime("%Y-%m") if e.tanggal else ""
-        if e.tipe == "pemasukan":
-            total += e.nominal
-            if tgl_str == current_month_str:
-                masuk_bulan_ini += e.nominal
-        elif e.tipe == "pengeluaran" and e.approval_status == PengeluaranStatus.approved:
-            total -= e.nominal
-            if tgl_str == current_month_str:
-                keluar_bulan_ini += e.nominal
+    saldo_expr = func.coalesce(
+        func.sum(
+            case(
+                (KasEntry.tipe == "pemasukan", KasEntry.nominal),
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved),
+                    -KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
 
+    masuk_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pemasukan")
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
+
+    keluar_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (KasEntry.tipe == "pengeluaran")
+                    & (KasEntry.approval_status == PengeluaranStatus.approved)
+                    & (KasEntry.tanggal >= start_m)
+                    & (KasEntry.tanggal <= end_m),
+                    KasEntry.nominal,
+                ),
+                else_=0.0,
+            )
+        ),
+        0.0,
+    )
+
+    row = base_query.with_entities(saldo_expr, masuk_expr, keluar_expr).one()
     return {
-        "saldo": total,
-        "total_masuk_bulan_ini": masuk_bulan_ini,
-        "total_keluar_bulan_ini": keluar_bulan_ini,
-        "periode": current_month_str,
+        "saldo": float(row[0]),
+        "total_masuk_bulan_ini": float(row[1]),
+        "total_keluar_bulan_ini": float(row[2]),
+        "periode": today.strftime("%Y-%m"),
     }
 
 
@@ -143,16 +204,15 @@ def list_kas_entries(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "ketua")),
 ):
-    query = db.query(KasEntry).filter(KasEntry.komunitas_id == user.komunitas_id)
+    query = get_pic_scoped_kas_query(db, user.komunitas_id, user)
     if tipe:
         query = query.filter(KasEntry.tipe == tipe)
-    entries = query.order_by(KasEntry.tanggal.desc()).all()
-    filtered = filter_kas_entries_by_pic(db, entries, user)
+    query = query.order_by(KasEntry.tanggal.desc())
     if offset > 0:
-        filtered = filtered[offset:]
+        query = query.offset(offset)
     if limit is not None:
-        filtered = filtered[:limit]
-    return filtered
+        query = query.limit(limit)
+    return query.all()
 
 
 def filter_kas_entries_by_pic(db: Session, entries: list[KasEntry], user: User) -> list[KasEntry]:
@@ -185,6 +245,19 @@ def filter_kas_entries_by_pic(db: Session, entries: list[KasEntry], user: User) 
         return entry.created_by == user.id
 
     return [e for e in entries if _is_visible(e)]
+
+
+@router.get("/pending-count")
+def get_pending_count(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "ketua")),
+):
+    """Fast indexed COUNT of pending pengeluaran."""
+    query = get_pic_scoped_kas_query(db, user.komunitas_id, user).filter(
+        KasEntry.tipe == "pengeluaran",
+        KasEntry.approval_status == PengeluaranStatus.pending,
+    )
+    return {"pending_count": query.count()}
 
 
 @router.get("/saldo")
