@@ -1088,10 +1088,14 @@ export default function TagihanTab({
           onEndChange={setTunggakanEnd}
           data={tunggakanList}
           loading={tunggakanLoading}
-          error={tunggakanError}
-          onDismissError={() => setTunggakanError("")}
+          error={tunggakanError || error}
+          onDismissError={() => {
+            setTunggakanError("");
+            setError("");
+          }}
           onPayWarga={openPayAllWargaTunggakan}
           onOpenFuturePay={openFutureModalForWarga}
+          onDeleteTagihan={(id) => setDeletingTagihanId(id)}
           isAdmin={isAdmin}
         />
       )}
@@ -1447,6 +1451,7 @@ interface TunggakanMultiSectionProps {
   onDismissError: () => void;
   onPayWarga: (w: TunggakanMulti) => void;
   onOpenFuturePay: (wargaId: string) => void;
+  onDeleteTagihan: (tagihanId: string) => void;
   isAdmin?: boolean;
 }
 
@@ -1467,6 +1472,7 @@ function TunggakanMultiSection({
   onDismissError,
   onPayWarga,
   onOpenFuturePay,
+  onDeleteTagihan,
   isAdmin = true,
 }: TunggakanMultiSectionProps): ReactElement {
   const totalWargaNunggak = data.length;
@@ -1628,12 +1634,22 @@ function TunggakanMultiSection({
                         {w.unpaid_periods.map((p, idx) => (
                           <span
                             key={`${p.periode}-${p.iuran_nama}-${idx}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium border border-slate-200/60"
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium border border-slate-200/60"
                             title={formatRupiah(p.nominal)}
                           >
                             <span>{formatPeriodeLabel(p.periode)}</span>
                             <span className="text-slate-400">&bull;</span>
                             <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteTagihan(p.tagihan_id)}
+                                className="ml-1 p-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                                title={`Hapus tagihan ${p.iuran_nama} (${p.periode})`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -1711,12 +1727,22 @@ function TunggakanMultiSection({
                   {w.unpaid_periods.map((p, idx) => (
                     <span
                       key={`${p.periode}-${p.iuran_nama}-${idx}`}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60"
                       title={formatRupiah(p.nominal)}
                     >
                       <span>{formatPeriodeLabel(p.periode)}</span>
                       <span className="text-slate-400">&bull;</span>
                       <span className="text-slate-600 font-normal">{p.iuran_nama}</span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTagihan(p.tagihan_id)}
+                          className="ml-1 p-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                          title={`Hapus tagihan ${p.iuran_nama} (${p.periode})`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
