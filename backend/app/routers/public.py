@@ -212,6 +212,10 @@ def public_entries(
     slug: str,
     bendahara: str | None = None,
     tipe: str | None = None,
+    combine_iuran: bool = Query(
+        default=True,
+        description="Whether to aggregate individual iuran payments into a single monthly sum",
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -244,16 +248,97 @@ def public_entries(
     if tipe:
         base_query = base_query.filter(KasEntry.tipe == tipe)
 
-    total = base_query.count()
+    all_rows = base_query.order_by(KasEntry.tanggal.desc(), KasEntry.created_at.desc()).all()
+
+    if combine_iuran:
+        # Aggregate iuran per month, keeping other entries (pengeluaran, donasi, jimpitan) distinct
+        months_order: list[str] = []
+        month_other_entries: dict[str, list[KasEntry]] = {}
+        monthly_iuran_map: dict[str, dict] = {}
+
+        for e in all_rows:
+            ym = e.tanggal.strftime("%Y-%m")
+            if ym not in months_order:
+                months_order.append(ym)
+                month_other_entries[ym] = []
+
+            if e.tipe == "pemasukan" and e.kategori == "iuran":
+                if ym not in monthly_iuran_map:
+                    monthly_iuran_map[ym] = {
+                        "count": 0,
+                        "nominal": 0.0,
+                        "latest_tanggal": e.tanggal,
+                        "id": f"iuran-agg-{ym}",
+                        "iuran_nama": (
+                            e.tagihan.iuran_type.nama
+                            if e.tagihan and e.tagihan.iuran_type
+                            else None
+                        ),
+                    }
+                rec = monthly_iuran_map[ym]
+                rec["count"] += 1
+                rec["nominal"] += e.nominal
+                if e.tanggal > rec["latest_tanggal"]:
+                    rec["latest_tanggal"] = e.tanggal
+            else:
+                month_other_entries[ym].append(e)
+
+        timeline: list[PublicLedgerEntry] = []
+        for ym in months_order:
+            # 1. Other distinct entries in this month (already sorted desc)
+            for oe in month_other_entries[ym]:
+                timeline.append(
+                    PublicLedgerEntry(
+                        id=oe.id,
+                        tipe=oe.tipe,
+                        kategori=oe.kategori,
+                        nominal=oe.nominal,
+                        tanggal=oe.tanggal,
+                        deskripsi=oe.deskripsi,
+                        receipt_image_path=oe.receipt_image_path,
+                    )
+                )
+            # 2. Combined iuran summary for this month
+            if ym in monthly_iuran_map:
+                rec = monthly_iuran_map[ym]
+                iuran_label = (
+                    f"Total {rec['iuran_nama']}" if rec["iuran_nama"] else "Total Iuran Warga"
+                )
+                desc = (
+                    f"{iuran_label} Masuk ({rec['count']} pembayaran)"
+                    if rec["count"] > 1
+                    else f"{iuran_label} Masuk"
+                )
+                timeline.append(
+                    PublicLedgerEntry(
+                        id=rec["id"],
+                        tipe="pemasukan",
+                        kategori="iuran",
+                        nominal=rec["nominal"],
+                        tanggal=rec["latest_tanggal"],
+                        deskripsi=desc,
+                        receipt_image_path=None,
+                    )
+                )
+
+        total = len(timeline)
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        offset = (page - 1) * page_size
+        paginated_items = timeline[offset : offset + page_size]
+
+        return PublicLedgerPagination(
+            items=paginated_items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+        )
+
+    # If combine_iuran is False, return itemized raw ledger
+    total = len(all_rows)
     total_pages = max(1, (total + page_size - 1) // page_size)
     offset = (page - 1) * page_size
-
-    rows = (
-        base_query.order_by(KasEntry.tanggal.desc(), KasEntry.created_at.desc())
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
+    rows = all_rows[offset : offset + page_size]
 
     items = [
         PublicLedgerEntry(

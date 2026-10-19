@@ -36,6 +36,7 @@ export default function PublicPage(): ReactElement {
   const [entriesData, setEntriesData] = useState<PublicLedgerPagination | null>(null);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entryFilter, setEntryFilter] = useState<"semua" | "pemasukan" | "pengeluaran">("semua");
+  const [combineIuran, setCombineIuran] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
@@ -65,12 +66,13 @@ export default function PublicPage(): ReactElement {
           page,
           page_size: pageSize,
           tipe: entryFilter !== "semua" ? entryFilter : undefined,
+          combine_iuran: combineIuran,
         },
       })
       .then((resp) => setEntriesData(resp.data))
       .catch(() => {})
       .finally(() => setEntriesLoading(false));
-  }, [slug, bendahara, page, pageSize, entryFilter]);
+  }, [slug, bendahara, page, pageSize, entryFilter, combineIuran]);
 
   function handleShare(): void {
     if (navigator.clipboard) {
@@ -449,51 +451,86 @@ export default function PublicPage(): ReactElement {
               </p>
             </div>
 
-            {/* Filter pills */}
-            <div className="flex items-center gap-1.5 self-start sm:self-auto">
-              <Filter className="w-4 h-4 text-slate-400 mr-1" />
-              <button
-                type="button"
-                onClick={() => {
-                  setEntryFilter("semua");
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  entryFilter === "semua"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                Semua
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEntryFilter("pemasukan");
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  entryFilter === "pemasukan"
-                    ? "bg-emerald-700 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                Pemasukan
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEntryFilter("pengeluaran");
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  entryFilter === "pengeluaran"
-                    ? "bg-rose-700 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                Pengeluaran
-              </button>
+            {/* Filter pills & Grouping toggle */}
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCombineIuran(true);
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    combineIuran
+                      ? "bg-white text-emerald-800 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  title="Gabungkan pemasukan iuran per bulan"
+                >
+                  Rekap Bulanan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCombineIuran(false);
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    !combineIuran
+                      ? "bg-white text-emerald-800 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                  title="Tampilkan rincian transaksi per pembayaran"
+                >
+                  Rincian Detail
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 pl-1 border-l border-slate-200">
+                <Filter className="w-3.5 h-3.5 text-slate-400 mr-0.5" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryFilter("semua");
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    entryFilter === "semua"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryFilter("pemasukan");
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    entryFilter === "pemasukan"
+                      ? "bg-emerald-700 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Pemasukan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryFilter("pengeluaran");
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    entryFilter === "pengeluaran"
+                      ? "bg-rose-700 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Pengeluaran
+                </button>
+              </div>
             </div>
           </div>
 
