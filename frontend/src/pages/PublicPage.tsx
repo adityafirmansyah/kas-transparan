@@ -395,8 +395,8 @@ export default function PublicPage(): ReactElement {
                 Belum Ada Pengeluaran Bulan Ini
               </p>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                Tidak ada pengeluaran kas yang disetujui pada periode {summary.periode}. Seluruh dana
-                warga tetap terjaga utuh.
+                Tidak ada pengeluaran kas yang disetujui pada periode {summary.periode}. Seluruh
+                dana warga tetap terjaga utuh.
               </p>
             </div>
           ) : (
@@ -521,7 +521,9 @@ export default function PublicPage(): ReactElement {
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-500">
                       <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="font-semibold text-slate-700">Belum ada transaksi kas tercatat</p>
+                      <p className="font-semibold text-slate-700">
+                        Belum ada transaksi kas tercatat
+                      </p>
                     </td>
                   </tr>
                 ) : (
