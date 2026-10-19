@@ -269,11 +269,18 @@ def test_public_entries_privacy_and_pagination(client, db_session):
     db_session.add(entry)
     db_session.commit()
 
-    resp = client.get(f"/api/public/{kom.slug}/entries")
+    # Verify combined aggregation mode (default)
+    resp = client.get(f"/api/public/{kom.slug}/entries?combine_iuran=true")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] == 1
     item = data["items"][0]
+    assert "Total Kas Warga Masuk" in item["deskripsi"]
+
+    # Verify itemized mode
+    resp_raw = client.get(f"/api/public/{kom.slug}/entries?combine_iuran=false")
+    assert resp_raw.status_code == 200
+    assert resp_raw.json()["total"] == 1
     # Verify resident name is sanitized out
-    assert "Bpk Rahasia Pribadi" not in item["deskripsi"]
-    assert "Kas Warga" in item["deskripsi"]
+    assert "Bpk Rahasia Pribadi" not in resp_raw.json()["items"][0]["deskripsi"]
+    assert "Kas Warga" in resp_raw.json()["items"][0]["deskripsi"]
