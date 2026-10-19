@@ -210,6 +210,7 @@ class KasEntry(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     komunitas = relationship("Komunitas", back_populates="kas_entries")
+    tagihan = relationship("Tagihan")
 
     __table_args__ = (
         Index("ix_kas_komunitas_tanggal", "komunitas_id", "tanggal"),
