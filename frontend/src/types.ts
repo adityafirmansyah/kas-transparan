@@ -151,6 +151,30 @@ export interface WargaSelfCheckResponse {
   tagihan_list: WargaSelfCheckTagihan[];
 }
 
+export interface BendaharaPublicInfo {
+  username: string;
+  nama: string;
+  iuran_nama?: string | null;
+}
+
+export interface PublicLedgerEntry {
+  id: string;
+  tipe: "pemasukan" | "pengeluaran";
+  kategori: string;
+  nominal: number;
+  tanggal: string;
+  deskripsi?: string | null;
+  receipt_image_path?: string | null;
+}
+
+export interface PublicLedgerPagination {
+  items: PublicLedgerEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export interface PublicSummary {
   komunitas_nama: string;
   saldo_akhir: number;
@@ -158,6 +182,10 @@ export interface PublicSummary {
   total_keluar_bulan_ini: number;
   pengeluaran_per_kategori: Record<string, number>;
   periode: string;
+  bendahara_username?: string | null;
+  bendahara_nama?: string | null;
+  bendahara_iuran?: string | null;
+  available_bendaharas?: BendaharaPublicInfo[];
 }
 
 /** Shape returned by GET /api/kas/saldo. */

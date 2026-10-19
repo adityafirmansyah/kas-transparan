@@ -49,6 +49,7 @@ function App(): ReactElement {
         />
         <Route path="/public/:slug" element={<PublicPage />} />
         <Route path="/public/:slug/cek-tagihan" element={<WargaSelfCheckPage />} />
+        <Route path="/public/:slug/:bendahara" element={<PublicPage />} />
       </Routes>
     </BrowserRouter>
   );

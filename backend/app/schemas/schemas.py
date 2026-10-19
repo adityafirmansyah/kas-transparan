@@ -286,6 +286,12 @@ class WargaSelfCheckResponse(BaseModel):
     tagihan_list: list[WargaSelfCheckTagihan]
 
 
+class BendaharaPublicInfo(BaseModel):
+    username: str
+    nama: str
+    iuran_nama: str | None = None
+
+
 class PublicSummary(BaseModel):
     komunitas_nama: str
     saldo_akhir: float
@@ -293,15 +299,28 @@ class PublicSummary(BaseModel):
     total_keluar_bulan_ini: float
     pengeluaran_per_kategori: dict[str, float]
     periode: str
+    bendahara_username: str | None = None
+    bendahara_nama: str | None = None
+    bendahara_iuran: str | None = None
+    available_bendaharas: list[BendaharaPublicInfo] = []
 
 
 class PublicLedgerEntry(BaseModel):
+    id: str
     tipe: str
     kategori: str
     nominal: float
     tanggal: date
-    # deskripsi/warga identity intentionally omitted for privacy on pengeluaran->ok to show desc
     deskripsi: str | None = None
+    receipt_image_path: str | None = None
+
+
+class PublicLedgerPagination(BaseModel):
+    items: list[PublicLedgerEntry]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class DefaultKomunitasOut(BaseModel):

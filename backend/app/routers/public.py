@@ -12,15 +12,29 @@ privacy we deliberately:
 from calendar import monthrange
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import case, func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import KasEntry, Komunitas, PengeluaranStatus, Tagihan, TagihanStatus, Warga
+from app.models.models import (
+    IuranType,
+    KasEntry,
+    Komunitas,
+    PengeluaranStatus,
+    Tagihan,
+    TagihanStatus,
+    User,
+    UserRole,
+    Warga,
+)
+from app.routers.kas import get_pic_scoped_kas_query
 from app.schemas.schemas import (
+    BendaharaPublicInfo,
     DefaultKomunitasOut,
+    PublicLedgerEntry,
+    PublicLedgerPagination,
     PublicSummary,
     WargaSelfCheckResponse,
     WargaSelfCheckTagihan,
@@ -51,15 +65,55 @@ def get_default_komunitas(db: Session = Depends(get_db)):
     return DefaultKomunitasOut(slug=komunitas.slug, nama=komunitas.nama)
 
 
+def _sanitize_public_desc(entry: KasEntry) -> str:
+    """Sanitizes transaction description to protect resident household privacy."""
+    if entry.tipe == "pemasukan" and entry.kategori == "iuran":
+        if entry.tagihan and entry.tagihan.iuran_type:
+            return f"Iuran {entry.tagihan.iuran_type.nama} ({entry.tagihan.periode})"
+        return "Iuran Warga Masuk"
+    return entry.deskripsi or ""
+
+
 @router.get("/{slug}/summary", response_model=PublicSummary)
+@router.get("/{slug}/{bendahara}/summary", response_model=PublicSummary)
 def public_summary(
     slug: str,
+    bendahara: str | None = None,
     periode: str | None = None,
     db: Session = Depends(get_db),
 ):
     komunitas = db.query(Komunitas).filter(Komunitas.slug == slug).first()
     if not komunitas:
         raise HTTPException(status_code=404, detail="Komunitas tidak ditemukan")
+
+    admins = (
+        db.query(User)
+        .filter(User.komunitas_id == komunitas.id, User.role == UserRole.admin)
+        .order_by(User.created_at.asc())
+        .all()
+    )
+    admin_ids = [a.id for a in admins]
+    iuran_rows = (
+        db.query(IuranType.admin_id, IuranType.nama)
+        .filter(IuranType.komunitas_id == komunitas.id, IuranType.admin_id.in_(admin_ids))
+        .all()
+    )
+    iuran_map = {aid: nama for aid, nama in iuran_rows}
+
+    available_bendaharas = [
+        BendaharaPublicInfo(
+            username=a.username,
+            nama=a.nama or a.username,
+            iuran_nama=iuran_map.get(a.id),
+        )
+        for a in admins
+    ]
+
+    target_admin = None
+    if bendahara:
+        target_admin = next((a for a in admins if a.username == bendahara), None)
+        if not target_admin:
+            raise HTTPException(status_code=404, detail="Bendahara tidak ditemukan")
 
     target_periode = periode or date.today().strftime("%Y-%m")
     try:
@@ -121,7 +175,7 @@ def public_summary(
         0.0,
     )
 
-    base_query = db.query(KasEntry).filter(KasEntry.komunitas_id == komunitas.id)
+    base_query = get_pic_scoped_kas_query(db, komunitas.id, target_admin)
     totals = base_query.with_entities(saldo_expr, masuk_expr, keluar_expr).one()
 
     # 4. Pengeluaran per Kategori di Bulan Ini
@@ -145,6 +199,81 @@ def public_summary(
         total_keluar_bulan_ini=float(totals[2]),
         pengeluaran_per_kategori=pengeluaran_per_kategori,
         periode=target_periode,
+        bendahara_username=target_admin.username if target_admin else None,
+        bendahara_nama=(target_admin.nama or target_admin.username) if target_admin else None,
+        bendahara_iuran=iuran_map.get(target_admin.id) if target_admin else None,
+        available_bendaharas=available_bendaharas,
+    )
+
+
+@router.get("/{slug}/entries", response_model=PublicLedgerPagination)
+@router.get("/{slug}/{bendahara}/entries", response_model=PublicLedgerPagination)
+def public_entries(
+    slug: str,
+    bendahara: str | None = None,
+    tipe: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    komunitas = db.query(Komunitas).filter(Komunitas.slug == slug).first()
+    if not komunitas:
+        raise HTTPException(status_code=404, detail="Komunitas tidak ditemukan")
+
+    target_admin = None
+    if bendahara:
+        target_admin = (
+            db.query(User)
+            .filter(
+                User.komunitas_id == komunitas.id,
+                User.username == bendahara,
+                User.role == UserRole.admin,
+            )
+            .first()
+        )
+        if not target_admin:
+            raise HTTPException(status_code=404, detail="Bendahara tidak ditemukan")
+
+    base_query = get_pic_scoped_kas_query(db, komunitas.id, target_admin).filter(
+        or_(
+            KasEntry.tipe == "pemasukan",
+            KasEntry.approval_status == PengeluaranStatus.approved,
+        )
+    )
+
+    if tipe:
+        base_query = base_query.filter(KasEntry.tipe == tipe)
+
+    total = base_query.count()
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    offset = (page - 1) * page_size
+
+    rows = (
+        base_query.order_by(KasEntry.tanggal.desc(), KasEntry.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    items = [
+        PublicLedgerEntry(
+            id=e.id,
+            tipe=e.tipe,
+            kategori=e.kategori,
+            nominal=e.nominal,
+            tanggal=e.tanggal,
+            deskripsi=_sanitize_public_desc(e),
+            receipt_image_path=e.receipt_image_path,
+        )
+        for e in rows
+    ]
+
+    return PublicLedgerPagination(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 
